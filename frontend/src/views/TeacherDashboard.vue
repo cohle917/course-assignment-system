@@ -25,16 +25,22 @@
             <h3>我的课程</h3>
             <el-row :gutter="20">
               <el-col :span="8" v-for="course in myCourses" :key="course.id">
-                <el-card class="course-card">
+                <el-card class="course-card" @click="viewCourseDetail(course.id)" style="cursor: pointer;">
                   <h4>{{ course.name }}</h4>
                   <p>{{ course.description }}</p>
                   <p>选课人数：{{ course.studentCount || 0 }}</p>
-                  <el-button type="primary" size="small" @click="viewCourseStudents(course.id)">
-                    查看学生
-                  </el-button>
+                  <div class="course-actions">
+                    <el-button type="primary" size="small" @click.stop="viewCourseDetail(course.id)">
+                      查看详情
+                    </el-button>
+                    <el-button type="success" size="small" @click.stop="viewCourseStudents(course.id)">
+                      查看学生
+                    </el-button>
+                  </div>
                 </el-card>
               </el-col>
             </el-row>
+            <el-empty v-if="myCourses.length === 0" description="暂无课程" />
           </div>
           
           <div v-if="activeMenu === 'homeworks'">
@@ -164,19 +170,21 @@ export default {
     
     async loadMyCourses() {
       try {
-        const response = await api.getMyCourses()
-        this.myCourses = response.data
+        const result = await api.getTeacherCourses()
+        this.myCourses = result.data || []
       } catch (error) {
-        ElMessage.error('加载课程失败')
+        console.error('加载课程失败:', error)
+        ElMessage.error('加载课程失败: ' + (error.message || '未知错误'))
+        this.myCourses = []
       }
     },
     
     async loadHomeworks() {
       try {
-        const response = await api.getHomeworks()
-        this.homeworks = response.data
+        const result = await api.getHomeworks()
+        this.homeworks = result.data || []
       } catch (error) {
-        ElMessage.error('加载作业失败')
+        ElMessage.error('加载作业失败: ' + (error.message || '未知错误'))
       }
     },
     
@@ -198,28 +206,32 @@ export default {
         this.activeMenu = 'homeworks'
         this.loadHomeworks()
       } catch (error) {
-        ElMessage.error('发布失败')
+        ElMessage.error('发布失败: ' + (error.message || '未知错误'))
       }
     },
     
     async viewCourseStudents(courseId) {
       try {
-        const response = await api.getCourseStudents(courseId)
-        this.courseStudents = response.data
+        const result = await api.getCourseStudents(courseId)
+        this.courseStudents = result.data || []
         this.studentsDialogVisible = true
       } catch (error) {
-        ElMessage.error('加载学生列表失败')
+        ElMessage.error('加载学生列表失败: ' + (error.message || '未知错误'))
       }
     },
     
     async viewSubmissions(homeworkId) {
       try {
-        const response = await api.getHomeworkSubmissions(homeworkId)
-        this.homeworkSubmissions = response.data
+        const result = await api.getHomeworkSubmissions(homeworkId)
+        this.homeworkSubmissions = result.data || []
         this.submissionsDialogVisible = true
       } catch (error) {
-        ElMessage.error('加载提交列表失败')
+        ElMessage.error('加载提交列表失败: ' + (error.message || '未知错误'))
       }
+    },
+    
+    viewCourseDetail(courseId) {
+      this.$router.push(`/teacher/course/${courseId}`)
     },
     
     handleLogout() {
@@ -254,6 +266,17 @@ export default {
 
 .course-card {
   margin-bottom: 20px;
+  transition: box-shadow 0.3s;
+}
+
+.course-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.course-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
 }
 
 h3 {

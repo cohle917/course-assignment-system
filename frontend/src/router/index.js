@@ -3,6 +3,7 @@ import Login from '../views/Login.vue'
 import StudentDashboard from '../views/StudentDashboard.vue'
 import TeacherDashboard from '../views/TeacherDashboard.vue'
 import AdminDashboard from '../views/AdminDashboard.vue'
+import CourseDetail from '../views/CourseDetail.vue'
 
 const routes = [
   {
@@ -21,9 +22,21 @@ const routes = [
     meta: { requiresAuth: true, role: 'student' }
   },
   {
+    path: '/student/course/:courseId',
+    name: 'StudentCourseDetail',
+    component: CourseDetail,
+    meta: { requiresAuth: true, role: 'student' }
+  },
+  {
     path: '/teacher',
     name: 'TeacherDashboard',
     component: TeacherDashboard,
+    meta: { requiresAuth: true, role: 'teacher' }
+  },
+  {
+    path: '/teacher/course/:courseId',
+    name: 'TeacherCourseDetail',
+    component: CourseDetail,
     meta: { requiresAuth: true, role: 'teacher' }
   },
   {

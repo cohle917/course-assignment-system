@@ -54,12 +54,24 @@ export default {
     return apiClient.get('/course/list')
   },
   
+  getTeacherCourses() {
+    return apiClient.get('/course/teacher-courses', {
+      params: { teacherId: JSON.parse(localStorage.getItem('userInfo') || '{}').id }
+    })
+  },
+  
   selectCourse(courseId) {
-    return apiClient.post('/course/select', { courseId })
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+    return apiClient.post('/course/select', { 
+      courseId,
+      studentId: userInfo.id
+    })
   },
   
   getMyCourses() {
-    return apiClient.get('/course/my-courses')
+    return apiClient.get('/course/my-courses', {
+      params: { studentId: JSON.parse(localStorage.getItem('userInfo') || '{}').id }
+    })
   },
   
   getHomeworks() {
@@ -67,11 +79,18 @@ export default {
   },
   
   getMyHomeworks() {
-    return apiClient.get('/homework/my-homeworks')
+    return apiClient.get('/homework/my-homeworks', {
+      params: { studentId: JSON.parse(localStorage.getItem('userInfo') || '{}').id }
+    })
   },
   
   submitHomework(homeworkId, content) {
-    return apiClient.post('/homework/submit', { homeworkId, content })
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+    return apiClient.post('/homework/submit', { 
+      homeworkId, 
+      content,
+      studentId: userInfo.id 
+    })
   },
   
   publishHomework(data) {
@@ -80,6 +99,19 @@ export default {
   
   getCourseStudents(courseId) {
     return apiClient.get(`/course/${courseId}/students`)
+  },
+  
+  // 评论相关
+  getCourseComments(courseId) {
+    return apiClient.get(`/course/${courseId}/comments`)
+  },
+  
+  addComment(courseId, commentData) {
+    return apiClient.post(`/course/${courseId}/comments`, commentData)
+  },
+  
+  deleteComment(commentId) {
+    return apiClient.delete(`/course/comments/${commentId}`)
   },
   
   getHomeworkSubmissions(homeworkId) {

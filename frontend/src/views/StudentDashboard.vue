@@ -25,13 +25,17 @@
             <h3>我的课程</h3>
             <el-row :gutter="20">
               <el-col :span="8" v-for="course in myCourses" :key="course.id">
-                <el-card class="course-card">
+                <el-card class="course-card" @click="viewCourseDetail(course.id)" style="cursor: pointer;">
                   <h4>{{ course.name }}</h4>
                   <p>教师：{{ course.teacherName }}</p>
                   <p>{{ course.description }}</p>
+                  <el-button type="primary" size="small" @click.stop="viewCourseDetail(course.id)">
+                    查看详情
+                  </el-button>
                 </el-card>
               </el-col>
             </el-row>
+            <el-empty v-if="myCourses.length === 0" description="暂无已选课程" />
           </div>
           
           <div v-if="activeMenu === 'homeworks'">
@@ -74,14 +78,14 @@
             <h3>可选课程</h3>
             <el-row :gutter="20">
               <el-col :span="8" v-for="course in allCourses" :key="course.id">
-                <el-card class="course-card">
+                <el-card class="course-card" @click="viewCourseDetail(course.id)" style="cursor: pointer;">
                   <h4>{{ course.name }}</h4>
                   <p>教师：{{ course.teacherName }}</p>
                   <p>{{ course.description }}</p>
                   <el-button 
                     v-if="!course.selected" 
                     type="primary" 
-                    @click="handleSelectCourse(course.id)"
+                    @click.stop="handleSelectCourse(course.id)"
                   >
                     选课
                   </el-button>
@@ -89,6 +93,7 @@
                 </el-card>
               </el-col>
             </el-row>
+            <el-empty v-if="allCourses.length === 0" description="暂无可选课程" />
           </div>
         </el-main>
       </el-container>
@@ -158,22 +163,25 @@ export default {
     
     async loadMyCourses() {
       try {
-        const response = await api.getMyCourses()
-        this.myCourses = response.data
+        const result = await api.getMyCourses()
+        this.myCourses = result.data || []
       } catch (error) {
-        ElMessage.error('加载课程失败')
+        console.error('加载课程失败:', error)
+        ElMessage.error('加载课程失败: ' + (error.message || '未知错误'))
+        this.myCourses = []
       }
     },
     
     async loadAllCourses() {
       try {
-        const response = await api.getCourses()
-        this.allCourses = response.data.map(course => ({
+        const result = await api.getCourses()
+        this.allCourses = (result.data || []).map(course => ({
           ...course,
           selected: course.selected || false
         }))
       } catch (error) {
-        ElMessage.error('加载课程失败')
+        console.error('加载课程失败:', error)
+        ElMessage.error('加载课程失败: ' + (error.message || '未知错误'))
       }
     },
     
@@ -184,16 +192,17 @@ export default {
         this.loadAllCourses()
         this.loadMyCourses()
       } catch (error) {
-        ElMessage.error('选课失败')
+        ElMessage.error('选课失败: ' + (error.message || '未知错误'))
       }
     },
     
     async loadMyHomeworks() {
       try {
-        const response = await api.getMyHomeworks()
-        this.myHomeworks = response.data
+        const result = await api.getMyHomeworks()
+        this.myHomeworks = result.data || []
       } catch (error) {
-        ElMessage.error('加载作业失败')
+        ElMessage.error('加载作业失败: ' + (error.message || '未知错误'))
+        this.myHomeworks = []
       }
     },
     
@@ -210,12 +219,16 @@ export default {
         this.submitDialogVisible = false
         this.loadMyHomeworks()
       } catch (error) {
-        ElMessage.error('提交失败')
+        ElMessage.error('提交失败: ' + (error.message || '未知错误'))
       }
     },
     
     viewSubmission(homework) {
       ElMessage.info('查看作业功能')
+    },
+    
+    viewCourseDetail(courseId) {
+      this.$router.push(`/student/course/${courseId}`)
     },
     
     handleLogout() {
@@ -250,6 +263,11 @@ export default {
 
 .course-card {
   margin-bottom: 20px;
+  transition: box-shadow 0.3s;
+}
+
+.course-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 h3 {
