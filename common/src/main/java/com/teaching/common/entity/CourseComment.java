@@ -35,7 +35,10 @@ public class CourseComment {
     
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
-    
+
+    @Column
+    private Integer rating;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
     
@@ -77,7 +80,10 @@ public class CourseComment {
     
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
-    
+
+    public Integer getRating() { return rating; }
+    public void setRating(Integer rating) { this.rating = rating; }
+
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     

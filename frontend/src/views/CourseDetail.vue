@@ -13,210 +13,271 @@
           </div>
         </div>
       </el-header>
-      
+
       <el-main v-loading="loading">
-        <el-card v-if="course">
-          <template #header>
-            <div class="card-header">
-              <h3>{{ course.name }}</h3>
-              <el-tag v-if="course.status === 'open'" type="success">进行中</el-tag>
-              <el-tag v-else type="info">已结束</el-tag>
+        <!-- 课程头部信息 -->
+        <div v-if="course" class="course-hero">
+          <div class="hero-cover">
+            <img v-if="course.coverImage" :src="course.coverImage" alt="封面" />
+            <div v-else class="cover-placeholder">
+              <span>{{ course.name?.charAt(0) || '课' }}</span>
             </div>
-          </template>
-          
-          <el-descriptions :column="2" border>
-            <el-descriptions-item label="课程代码">{{ course.code || '暂无' }}</el-descriptions-item>
-            <el-descriptions-item label="授课教师">{{ course.teacherName }}</el-descriptions-item>
-            <el-descriptions-item label="学分">{{ course.credit }}</el-descriptions-item>
-            <el-descriptions-item label="选课人数">{{ course.currentStudents }}/{{ course.maxStudents }}</el-descriptions-item>
-            <el-descriptions-item label="学期">{{ course.semester || '暂无' }}</el-descriptions-item>
-            <el-descriptions-item label="课程状态">
-              <el-tag :type="course.status === 'open' ? 'success' : 'info'">
-                {{ course.status === 'open' ? '开放选课' : '已关闭' }}
+          </div>
+          <div class="hero-info">
+            <div class="hero-tags">
+              <el-tag v-if="course.category" type="warning">{{ course.category }}</el-tag>
+              <el-tag v-if="course.department" type="info">{{ course.department }}</el-tag>
+              <el-tag :type="course.status === 'open' ? 'success' : 'danger'">
+                {{ course.status === 'open' ? '进行中' : '已结束' }}
               </el-tag>
-            </el-descriptions-item>
-          </el-descriptions>
-          
-          <div class="course-description">
-            <h4>课程简介</h4>
-            <p>{{ course.description || '暂无课程简介' }}</p>
-          </div>
-        </el-card>
-        
-        <!-- 学生端：显示作业列表 -->
-        <el-card v-if="isStudent" class="homework-card">
-          <template #header>
-            <h4>课程作业</h4>
-          </template>
-          
-          <el-table :data="courseHomeworks" border>
-            <el-table-column prop="title" label="作业标题" />
-            <el-table-column prop="deadline" label="截止日期" />
-            <el-table-column prop="status" label="状态">
-              <template #default="scope">
-                <el-tag :type="scope.row.status === '已完成' ? 'success' : 'warning'">
-                  {{ scope.row.status }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作">
-              <template #default="scope">
-                <el-button 
-                  v-if="scope.row.status !== '已完成'" 
-                  type="primary" 
-                  size="small"
-                  @click="showSubmitDialog(scope.row)"
-                >
-                  提交作业
-                </el-button>
-                <el-button 
-                  v-else 
-                  type="info" 
-                  size="small"
-                  @click="viewSubmission(scope.row)"
-                >
-                  查看
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-          
-          <el-empty v-if="courseHomeworks.length === 0" description="暂无作业" />
-        </el-card>
-        
-        <!-- 教师端：显示选课学生列表 -->
-        <el-card v-if="isTeacher" class="students-card">
-          <template #header>
-            <div class="card-header">
-              <h4>选课学生</h4>
-              <span class="student-count">共 {{ courseStudents.length }} 人</span>
             </div>
-          </template>
-          
-          <el-table :data="courseStudents" border>
-            <el-table-column prop="username" label="用户名" />
-            <el-table-column prop="name" label="姓名" />
-            <el-table-column prop="email" label="邮箱" />
-            <el-table-column label="操作">
-              <template #default="scope">
-                <el-button type="primary" size="small" @click="viewStudentHomeworks(scope.row)">
-                  查看作业
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-          
-          <el-empty v-if="courseStudents.length === 0" description="暂无选课学生" />
-        </el-card>
-        
-        <!-- 评论区 -->
-        <el-card class="comments-card">
-          <template #header>
-            <div class="comments-header">
-              <h4>课程讨论区</h4>
-              <span class="comment-count">共 {{ comments.length }} 条讨论</span>
-            </div>
-          </template>
-          
-          <!-- 发帖区域 -->
-          <div class="comment-input-area">
-            <el-input
-              v-model="newComment"
-              type="textarea"
-              :rows="3"
-              placeholder="有什么问题想和大家讨论？"
-            />
-            <div class="comment-actions">
-              <el-button type="primary" @click="handlePostComment" :disabled="!newComment.trim()">
-                发布
-              </el-button>
+            <h2 class="hero-name">{{ course.name }}</h2>
+            <p class="hero-meta">
+              <span>👨‍🏫 {{ course.teacherName }}</span>
+              <span>📚 {{ course.credit }} 学分</span>
+              <span>👥 {{ course.currentStudents || 0 }}/{{ course.maxStudents }} 人</span>
+              <span>📅 {{ course.semester }}</span>
+            </p>
+            <div class="hero-rating">
+              <StarRating :modelValue="course.avgRating || 0" :readonly="true" :size="20" showText />
+              <span class="review-count">({{ course.reviewCount || 0 }} 条评价)</span>
             </div>
           </div>
-          
-          <!-- 评论列表 -->
-          <div class="comments-list">
-            <div v-for="comment in comments" :key="comment.id" class="comment-item">
-              <div class="comment-main">
-                <div class="comment-avatar">
-                  <el-tag :type="getRoleTagType(comment.userRole)" size="small">
-                    {{ comment.userRole === 'teacher' ? '教师' : comment.userRole === 'admin' ? '管理员' : '学生' }}
-                  </el-tag>
+        </div>
+
+        <!-- Tab 切换 -->
+        <el-tabs v-if="course" v-model="activeTab" class="detail-tabs">
+          <el-tab-pane label="课程介绍" name="intro">
+            <el-card>
+              <el-descriptions :column="2" border>
+                <el-descriptions-item label="课程代码">{{ course.code || '暂无' }}</el-descriptions-item>
+                <el-descriptions-item label="课程分类">{{ course.category || '暂无' }}</el-descriptions-item>
+                <el-descriptions-item label="开课院系">{{ course.department || '暂无' }}</el-descriptions-item>
+                <el-descriptions-item label="学分">{{ course.credit }}</el-descriptions-item>
+                <el-descriptions-item label="选课人数">{{ course.currentStudents || 0 }}/{{ course.maxStudents }}</el-descriptions-item>
+                <el-descriptions-item label="学期">{{ course.semester || '暂无' }}</el-descriptions-item>
+              </el-descriptions>
+              <div class="section-block">
+                <h4>课程简介</h4>
+                <p class="description-text">{{ course.description || '暂无课程简介' }}</p>
+              </div>
+            </el-card>
+          </el-tab-pane>
+
+          <el-tab-pane label="课程大纲" name="syllabus">
+            <el-card>
+              <div v-if="course.syllabus" class="syllabus-content">
+                <pre class="syllabus-text">{{ course.syllabus }}</pre>
+              </div>
+              <el-empty v-else description="暂无课程大纲" />
+            </el-card>
+          </el-tab-pane>
+
+          <el-tab-pane label="讲师信息" name="instructor">
+            <el-card>
+              <div v-if="course.teacherInfo" class="instructor-info">
+                <div class="instructor-header">
+                  <el-avatar :size="64" icon="UserFilled" />
+                  <div class="instructor-detail">
+                    <h3>{{ course.teacherInfo.name }}</h3>
+                    <el-tag type="success">教师</el-tag>
+                  </div>
                 </div>
-                <div class="comment-content">
-                  <div class="comment-header">
-                    <span class="comment-author">{{ comment.userName }}</span>
-                    <span class="comment-time">{{ formatTime(comment.createdAt) }}</span>
-                  </div>
-                  <div class="comment-text">{{ comment.content }}</div>
-                  <div class="comment-actions-row">
-                    <el-button type="primary" link size="small" @click="showReplyInput(comment)">
-                      回复 ({{ comment.replyCount || 0 }})
-                    </el-button>
-                    <el-button 
-                      v-if="comment.userId == userInfo.id" 
-                      type="danger" 
-                      link 
-                      size="small"
-                      @click="handleDeleteComment(comment.id)"
-                    >
-                      删除
-                    </el-button>
-                  </div>
-                  
-                  <!-- 回复输入框 -->
-                  <div v-if="replyingTo === comment.id" class="reply-input-area">
-                    <el-input
-                      v-model="replyContent"
-                      type="textarea"
-                      :rows="2"
-                      :placeholder="`回复 @${comment.userName}：`"
-                    />
-                    <div class="reply-actions">
-                      <el-button size="small" @click="cancelReply">取消</el-button>
-                      <el-button type="primary" size="small" @click="handleReplyComment(comment.id)" :disabled="!replyContent.trim()">
-                        发布回复
-                      </el-button>
+                <el-descriptions :column="2" border class="instructor-desc">
+                  <el-descriptions-item label="所属院系">{{ course.teacherInfo.department || '暂无' }}</el-descriptions-item>
+                  <el-descriptions-item label="邮箱">{{ course.teacherInfo.email || '暂无' }}</el-descriptions-item>
+                  <el-descriptions-item label="电话">{{ course.teacherInfo.phone || '暂无' }}</el-descriptions-item>
+                  <el-descriptions-item label="用户名">{{ course.teacherInfo.username }}</el-descriptions-item>
+                </el-descriptions>
+              </div>
+              <el-empty v-else description="暂无讲师信息" />
+            </el-card>
+          </el-tab-pane>
+
+          <el-tab-pane label="课程评价" name="reviews">
+            <!-- 评分概览 -->
+            <el-card class="rating-overview">
+              <div class="rating-summary">
+                <div class="rating-score">
+                  <span class="score-number">{{ course.avgRating || 0 }}</span>
+                  <span class="score-total">/ 5</span>
+                </div>
+                <div class="rating-detail">
+                  <StarRating :modelValue="course.avgRating || 0" :readonly="true" :size="24" />
+                  <span class="review-count-text">{{ course.reviewCount || 0 }} 条评价</span>
+                </div>
+              </div>
+            </el-card>
+
+            <!-- 发表评价 -->
+            <el-card class="review-input-card">
+              <h4>发表评价</h4>
+              <div class="review-rating-row">
+                <span class="rating-label">评分：</span>
+                <StarRating v-model="reviewRating" :readonly="false" :size="22" />
+                <span class="rating-hint" v-if="reviewRating > 0">{{ reviewRating }} 分</span>
+              </div>
+              <el-input
+                v-model="newComment"
+                type="textarea"
+                :rows="3"
+                placeholder="分享你的学习体验..."
+              />
+              <div class="comment-actions">
+                <el-button type="primary" @click="handlePostComment" :disabled="!newComment.trim()">
+                  发布评价
+                </el-button>
+              </div>
+            </el-card>
+
+            <!-- 评价/讨论列表 -->
+            <el-card class="comments-card">
+              <template #header>
+                <h4>全部评价与讨论 ({{ comments.length }})</h4>
+              </template>
+              <div class="comments-list">
+                <div v-for="comment in comments" :key="comment.id" class="comment-item">
+                  <div class="comment-main">
+                    <div class="comment-avatar">
+                      <el-tag :type="getRoleTagType(comment.userRole)" size="small">
+                        {{ comment.userRole === 'teacher' ? '教师' : comment.userRole === 'admin' ? '管理员' : '学生' }}
+                      </el-tag>
                     </div>
-                  </div>
-                  
-                  <!-- 回复列表 -->
-                  <div v-if="comment.replies && comment.replies.length > 0" class="replies-list">
-                    <div v-for="reply in comment.replies" :key="reply.id" class="reply-item">
-                      <div class="reply-avatar">
-                        <el-tag :type="getRoleTagType(reply.userRole)" size="small">
-                          {{ reply.userRole === 'teacher' ? '教师' : reply.userRole === 'admin' ? '管理员' : '学生' }}
-                        </el-tag>
+                    <div class="comment-content">
+                      <div class="comment-header">
+                        <span class="comment-author">{{ comment.userName }}</span>
+                        <StarRating v-if="comment.rating" :modelValue="comment.rating" :readonly="true" :size="12" />
+                        <span class="comment-time">{{ formatTime(comment.createdAt) }}</span>
                       </div>
-                      <div class="reply-content">
-                        <div class="comment-header">
-                          <span class="comment-author">{{ reply.userName }}</span>
-                          <span class="comment-time">{{ formatTime(reply.createdAt) }}</span>
-                        </div>
-                        <div class="comment-text">{{ reply.content }}</div>
-                        <div class="comment-actions-row">
-                          <el-button 
-                            v-if="reply.userId == userInfo.id" 
-                            type="danger" 
-                            link 
-                            size="small"
-                            @click="handleDeleteComment(reply.id)"
-                          >
-                            删除
+                      <div class="comment-text">{{ comment.content }}</div>
+                      <div class="comment-actions-row">
+                        <el-button type="primary" link size="small" @click="showReplyInput(comment)">
+                          回复 ({{ comment.replyCount || 0 }})
+                        </el-button>
+                        <el-button
+                          v-if="comment.userId == userInfo.id"
+                          type="danger"
+                          link
+                          size="small"
+                          @click="handleDeleteComment(comment.id)"
+                        >
+                          删除
+                        </el-button>
+                      </div>
+
+                      <!-- 回复输入框 -->
+                      <div v-if="replyingTo === comment.id" class="reply-input-area">
+                        <el-input
+                          v-model="replyContent"
+                          type="textarea"
+                          :rows="2"
+                          :placeholder="`回复 @${comment.userName}：`"
+                        />
+                        <div class="reply-actions">
+                          <el-button size="small" @click="cancelReply">取消</el-button>
+                          <el-button type="primary" size="small" @click="handleReplyComment(comment.id)" :disabled="!replyContent.trim()">
+                            发布回复
                           </el-button>
                         </div>
                       </div>
+
+                      <!-- 回复列表 -->
+                      <div v-if="comment.replies && comment.replies.length > 0" class="replies-list">
+                        <div v-for="reply in comment.replies" :key="reply.id" class="reply-item">
+                          <div class="reply-avatar">
+                            <el-tag :type="getRoleTagType(reply.userRole)" size="small">
+                              {{ reply.userRole === 'teacher' ? '教师' : reply.userRole === 'admin' ? '管理员' : '学生' }}
+                            </el-tag>
+                          </div>
+                          <div class="reply-content">
+                            <div class="comment-header">
+                              <span class="comment-author">{{ reply.userName }}</span>
+                              <span class="comment-time">{{ formatTime(reply.createdAt) }}</span>
+                            </div>
+                            <div class="comment-text">{{ reply.content }}</div>
+                            <div class="comment-actions-row">
+                              <el-button
+                                v-if="reply.userId == userInfo.id"
+                                type="danger"
+                                link
+                                size="small"
+                                @click="handleDeleteComment(reply.id)"
+                              >
+                                删除
+                              </el-button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
+                <el-empty v-if="comments.length === 0" description="暂无讨论，快来发起第一个话题吧！" />
               </div>
-            </div>
-            
-            <el-empty v-if="comments.length === 0" description="暂无讨论，快来发起第一个话题吧！" />
-          </div>
-        </el-card>
+            </el-card>
+          </el-tab-pane>
+
+          <!-- 学生端：课程作业 -->
+          <el-tab-pane v-if="isStudent" label="课程作业" name="homeworks">
+            <el-card>
+              <el-table :data="courseHomeworks" border>
+                <el-table-column prop="title" label="作业标题" />
+                <el-table-column prop="deadline" label="截止日期" />
+                <el-table-column prop="status" label="状态">
+                  <template #default="scope">
+                    <el-tag :type="scope.row.status === '已完成' ? 'success' : 'warning'">
+                      {{ scope.row.status }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作">
+                  <template #default="scope">
+                    <el-button
+                      v-if="scope.row.status !== '已完成'"
+                      type="primary"
+                      size="small"
+                      @click="showSubmitDialog(scope.row)"
+                    >
+                      提交作业
+                    </el-button>
+                    <el-button v-else type="info" size="small" @click="viewSubmission(scope.row)">
+                      查看
+                    </el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+              <el-empty v-if="courseHomeworks.length === 0" description="暂无作业" />
+            </el-card>
+          </el-tab-pane>
+
+          <!-- 教师端：选课学生 -->
+          <el-tab-pane v-if="isTeacher" label="选课学生" name="students">
+            <el-card>
+              <template #header>
+                <div class="card-header">
+                  <h4>选课学生</h4>
+                  <span class="student-count">共 {{ courseStudents.length }} 人</span>
+                </div>
+              </template>
+              <el-table :data="courseStudents" border>
+                <el-table-column prop="username" label="用户名" />
+                <el-table-column prop="name" label="姓名" />
+                <el-table-column prop="email" label="邮箱" />
+                <el-table-column label="操作">
+                  <template #default="scope">
+                    <el-button type="primary" size="small" @click="viewStudentHomeworks(scope.row)">
+                      查看作业
+                    </el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+              <el-empty v-if="courseStudents.length === 0" description="暂无选课学生" />
+            </el-card>
+          </el-tab-pane>
+        </el-tabs>
       </el-main>
     </el-container>
-    
+
     <!-- 提交作业对话框 -->
     <el-dialog v-model="submitDialogVisible" title="提交作业" width="500px">
       <el-form :model="submitForm">
@@ -224,12 +285,7 @@
           <span>{{ submitForm.title }}</span>
         </el-form-item>
         <el-form-item label="作业内容">
-          <el-input 
-            v-model="submitForm.content" 
-            type="textarea" 
-            :rows="6"
-            placeholder="请输入作业内容"
-          />
+          <el-input v-model="submitForm.content" type="textarea" :rows="6" placeholder="请输入作业内容" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -243,25 +299,25 @@
 <script>
 import { ElMessage } from 'element-plus'
 import api from '../api'
+import StarRating from '../components/StarRating.vue'
 
 export default {
   name: 'CourseDetail',
+  components: { StarRating },
   data() {
     return {
       loading: false,
       userInfo: {},
       course: null,
+      activeTab: 'intro',
       courseHomeworks: [],
       courseStudents: [],
       submitDialogVisible: false,
-      submitForm: {
-        homeworkId: null,
-        title: '',
-        content: ''
-      },
+      submitForm: { homeworkId: null, title: '', content: '' },
       // 评论相关
       comments: [],
       newComment: '',
+      reviewRating: 0,
       replyContent: '',
       replyingTo: null
     }
@@ -280,12 +336,6 @@ export default {
   mounted() {
     this.loadUserInfo()
     this.loadCourseDetail()
-    if (this.isTeacher) {
-      this.loadCourseStudents()
-    }
-    if (this.isStudent) {
-      this.loadCourseHomeworks()
-    }
     this.loadComments()
   },
   methods: {
@@ -295,17 +345,19 @@ export default {
         this.userInfo = JSON.parse(userInfoStr)
       }
     },
-    
+
     async loadCourseDetail() {
       this.loading = true
       try {
-        const result = await api.getCourses()
-        const courses = result.data || []
-        this.course = courses.find(c => c.id == this.courseId)
+        const result = await api.getCourseDetail(this.courseId)
+        this.course = result.data
         if (!this.course) {
           ElMessage.error('课程不存在')
-          this.$router.push(this.isTeacher ? '/teacher' : '/student')
+          this.goBack()
         }
+        // 加载角色相关内容
+        if (this.isTeacher) this.loadCourseStudents()
+        if (this.isStudent) this.loadCourseHomeworks()
       } catch (error) {
         console.error('加载课程详情失败:', error)
         ElMessage.error('加载课程详情失败')
@@ -313,36 +365,33 @@ export default {
         this.loading = false
       }
     },
-    
+
     async loadCourseStudents() {
       try {
         const result = await api.getCourseStudents(this.courseId)
         this.courseStudents = result.data || []
       } catch (error) {
         console.error('加载学生列表失败:', error)
-        ElMessage.error('加载学生列表失败')
       }
     },
-    
+
     async loadCourseHomeworks() {
       try {
         const result = await api.getMyHomeworks()
         const allHomeworks = result.data || []
-        // 过滤出属于当前课程的作业
         this.courseHomeworks = allHomeworks.filter(h => h.courseName === this.course?.name)
       } catch (error) {
         console.error('加载作业列表失败:', error)
-        ElMessage.error('加载作业列表失败')
       }
     },
-    
+
     showSubmitDialog(homework) {
       this.submitForm.homeworkId = homework.id
       this.submitForm.title = homework.title
       this.submitForm.content = ''
       this.submitDialogVisible = true
     },
-    
+
     async handleSubmitHomework() {
       try {
         await api.submitHomework(this.submitForm.homeworkId, this.submitForm.content)
@@ -353,33 +402,31 @@ export default {
         ElMessage.error('提交失败: ' + (error.message || '未知错误'))
       }
     },
-    
-    viewSubmission(homework) {
+
+    viewSubmission() {
       ElMessage.info('查看作业功能')
     },
-    
-    viewStudentHomeworks(student) {
+
+    viewStudentHomeworks() {
       ElMessage.info('查看学生作业功能')
     },
-    
-    // ========== 评论相关方法 ==========
-    
+
+    // ========== 评论/评价方法 ==========
+
     async loadComments() {
       try {
         const result = await api.getCourseComments(this.courseId)
         this.comments = result.data || []
       } catch (error) {
         console.error('加载评论失败:', error)
-        ElMessage.error('加载评论失败')
       }
     },
-    
+
     async handlePostComment() {
       if (!this.newComment.trim()) {
         ElMessage.warning('请输入评论内容')
         return
       }
-      
       try {
         const commentData = {
           userId: this.userInfo.id,
@@ -388,37 +435,36 @@ export default {
           userRole: this.userInfo.role,
           content: this.newComment.trim()
         }
-        
+        if (this.reviewRating > 0) {
+          commentData.rating = this.reviewRating
+        }
         await api.addComment(this.courseId, commentData)
         ElMessage.success('发布成功')
         this.newComment = ''
+        this.reviewRating = 0
         this.loadComments()
+        // 刷新课程详情以更新评分
+        this.loadCourseDetail()
       } catch (error) {
         ElMessage.error('发布失败: ' + (error.message || '未知错误'))
       }
     },
-    
+
     showReplyInput(comment) {
-      if (this.replyingTo === comment.id) {
-        this.replyingTo = null
-        this.replyContent = ''
-      } else {
-        this.replyingTo = comment.id
-        this.replyContent = ''
-      }
+      this.replyingTo = this.replyingTo === comment.id ? null : comment.id
+      this.replyContent = ''
     },
-    
+
     cancelReply() {
       this.replyingTo = null
       this.replyContent = ''
     },
-    
+
     async handleReplyComment(parentId) {
       if (!this.replyContent.trim()) {
         ElMessage.warning('请输入回复内容')
         return
       }
-      
       try {
         const commentData = {
           userId: this.userInfo.id,
@@ -428,7 +474,6 @@ export default {
           parentId: parentId,
           content: this.replyContent.trim()
         }
-        
         await api.addComment(this.courseId, commentData)
         ElMessage.success('回复成功')
         this.replyContent = ''
@@ -438,7 +483,7 @@ export default {
         ElMessage.error('回复失败: ' + (error.message || '未知错误'))
       }
     },
-    
+
     async handleDeleteComment(commentId) {
       try {
         await this.$confirm('确定要删除这条评论吗？', '提示', {
@@ -446,46 +491,38 @@ export default {
           cancelButtonText: '取消',
           type: 'warning'
         })
-        
         await api.deleteComment(commentId)
         ElMessage.success('删除成功')
         this.loadComments()
+        this.loadCourseDetail()
       } catch (error) {
         if (error !== 'cancel') {
           ElMessage.error('删除失败: ' + (error.message || '未知错误'))
         }
       }
     },
-    
+
     getRoleTagType(role) {
-      const typeMap = {
-        'admin': 'danger',
-        'teacher': 'success',
-        'student': 'primary'
-      }
-      return typeMap[role] || 'info'
+      return { admin: 'danger', teacher: 'success', student: 'primary' }[role] || 'info'
     },
-    
+
     formatTime(timeStr) {
       if (!timeStr) return ''
-      const date = new Date(timeStr)
-      const now = new Date()
-      const diff = now - date
+      const diff = new Date() - new Date(timeStr)
       const seconds = Math.floor(diff / 1000)
       const minutes = Math.floor(seconds / 60)
       const hours = Math.floor(minutes / 60)
       const days = Math.floor(hours / 24)
-      
       if (days > 0) return `${days}天前`
       if (hours > 0) return `${hours}小时前`
       if (minutes > 0) return `${minutes}分钟前`
       return '刚刚'
     },
-    
+
     goBack() {
       this.$router.back()
     },
-    
+
     handleLogout() {
       localStorage.removeItem('userInfo')
       this.$router.push('/login')
@@ -495,186 +532,78 @@ export default {
 </script>
 
 <style scoped>
-.course-detail {
-  height: 100vh;
-}
+.course-detail { height: 100vh; }
+.header-content { display: flex; justify-content: space-between; align-items: center; height: 100%; }
+.header-left { display: flex; align-items: center; gap: 15px; }
+.el-header { background-color: #409EFF; color: white; }
+.el-main { padding: 20px; background-color: #f5f5f5; }
 
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  height: 100%;
-}
+/* 课程头部 */
+.course-hero { display: flex; gap: 24px; background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.hero-cover { width: 200px; height: 140px; border-radius: 8px; overflow: hidden; flex-shrink: 0; background: linear-gradient(135deg, #667eea, #764ba2); }
+.hero-cover img { width: 100%; height: 100%; object-fit: cover; }
+.cover-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+.cover-placeholder span { font-size: 56px; color: rgba(255,255,255,0.5); font-weight: bold; }
+.hero-info { flex: 1; }
+.hero-tags { display: flex; gap: 8px; margin-bottom: 8px; }
+.hero-name { margin: 0 0 8px 0; font-size: 24px; color: #303133; }
+.hero-meta { display: flex; gap: 20px; flex-wrap: wrap; margin: 0 0 10px 0; color: #606266; font-size: 14px; }
+.hero-rating { display: flex; align-items: center; gap: 8px; }
+.review-count { color: #909399; font-size: 13px; }
 
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
+/* Tabs */
+.detail-tabs { background: white; border-radius: 8px; padding: 8px 16px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.section-block { margin-top: 20px; }
+.section-block h4 { margin-bottom: 10px; color: #303133; }
+.description-text { color: #606266; line-height: 1.8; white-space: pre-wrap; }
+.syllabus-content { padding: 10px 0; }
+.syllabus-text { white-space: pre-wrap; font-family: inherit; color: #606266; line-height: 1.8; margin: 0; }
 
-.el-header {
-  background-color: #409EFF;
-  color: white;
-}
+/* 讲师 */
+.instructor-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+.instructor-detail h3 { margin: 0 0 6px 0; }
+.instructor-desc { margin-top: 16px; }
 
-.el-main {
-  padding: 20px;
-  background-color: #f5f5f5;
-}
+/* 评分 */
+.rating-overview { margin-bottom: 16px; }
+.rating-summary { display: flex; align-items: center; gap: 24px; }
+.rating-score { display: flex; align-items: baseline; gap: 2px; }
+.score-number { font-size: 48px; font-weight: bold; color: #f7ba2a; }
+.score-total { font-size: 18px; color: #909399; }
+.review-count-text { color: #909399; font-size: 13px; margin-left: 8px; }
 
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+/* 发表评价 */
+.review-input-card { margin-bottom: 16px; }
+.review-rating-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.rating-label { color: #606266; }
+.rating-hint { color: #f7ba2a; font-weight: 600; }
+.comment-actions { margin-top: 10px; text-align: right; }
 
-.card-header h3 {
-  margin: 0;
-}
+/* 评论列表 */
+.comments-card { margin-top: 16px; }
+.comments-header { display: flex; justify-content: space-between; align-items: center; }
+.comments-header h4 { margin: 0; }
+.comment-count { color: #909399; font-size: 14px; }
+.comments-list { margin-top: 0; }
+.comment-item { padding: 15px 0; border-bottom: 1px solid #ebeef5; }
+.comment-item:last-child { border-bottom: none; }
+.comment-main { display: flex; gap: 12px; }
+.comment-avatar { flex-shrink: 0; }
+.comment-content { flex: 1; min-width: 0; }
+.comment-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.comment-author { font-weight: 600; color: #303133; }
+.comment-time { color: #909399; font-size: 12px; }
+.comment-text { color: #606266; line-height: 1.6; margin-bottom: 8px; }
+.comment-actions-row { display: flex; gap: 15px; align-items: center; }
+.reply-input-area { margin-top: 10px; padding: 10px; background-color: #f5f7fa; border-radius: 4px; }
+.reply-actions { margin-top: 10px; text-align: right; }
+.replies-list { margin-top: 15px; padding-left: 20px; border-left: 2px solid #e4e7ed; }
+.reply-item { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f5f7fa; }
+.reply-item:last-child { border-bottom: none; }
+.reply-avatar { flex-shrink: 0; }
+.reply-content { flex: 1; min-width: 0; }
 
-.course-description {
-  margin-top: 20px;
-}
-
-.course-description h4 {
-  margin-bottom: 10px;
-}
-
-.homework-card,
-.students-card {
-  margin-top: 20px;
-}
-
-.student-count {
-  color: #909399;
-}
-
-.el-form {
-  padding: 10px 0;
-}
-
-/* ========== 评论区样式 ========== */
-.comments-card {
-  margin-top: 20px;
-}
-
-.comments-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.comments-header h4 {
-  margin: 0;
-}
-
-.comment-count {
-  color: #909399;
-  font-size: 14px;
-}
-
-.comment-input-area {
-  margin-bottom: 20px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid #ebeef5;
-}
-
-.comment-actions {
-  margin-top: 10px;
-  text-align: right;
-}
-
-.comments-list {
-  margin-top: 20px;
-}
-
-.comment-item {
-  padding: 15px 0;
-  border-bottom: 1px solid #ebeef5;
-}
-
-.comment-item:last-child {
-  border-bottom: none;
-}
-
-.comment-main {
-  display: flex;
-  gap: 12px;
-}
-
-.comment-avatar {
-  flex-shrink: 0;
-}
-
-.comment-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.comment-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-
-.comment-author {
-  font-weight: 600;
-  color: #303133;
-}
-
-.comment-time {
-  color: #909399;
-  font-size: 12px;
-}
-
-.comment-text {
-  color: #606266;
-  line-height: 1.6;
-  margin-bottom: 8px;
-}
-
-.comment-actions-row {
-  display: flex;
-  gap: 15px;
-  align-items: center;
-}
-
-.reply-input-area {
-  margin-top: 10px;
-  padding: 10px;
-  background-color: #f5f7fa;
-  border-radius: 4px;
-}
-
-.reply-actions {
-  margin-top: 10px;
-  text-align: right;
-}
-
-.replies-list {
-  margin-top: 15px;
-  padding-left: 20px;
-  border-left: 2px solid #e4e7ed;
-}
-
-.reply-item {
-  display: flex;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid #f5f7fa;
-}
-
-.reply-item:last-child {
-  border-bottom: none;
-}
-
-.reply-avatar {
-  flex-shrink: 0;
-}
-
-.reply-content {
-  flex: 1;
-  min-width: 0;
-}
+.card-header { display: flex; justify-content: space-between; align-items: center; }
+.card-header h4 { margin: 0; }
+.student-count { color: #909399; }
 </style>

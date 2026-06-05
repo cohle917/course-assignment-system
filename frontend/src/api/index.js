@@ -50,24 +50,48 @@ export default {
     return apiClient.get('/user/info')
   },
   
-  getCourses() {
-    return apiClient.get('/course/list')
+  getCourses(params = {}) {
+    return apiClient.get('/course/list', { params })
   },
-  
+
+  getCourseDetail(courseId) {
+    return apiClient.get(`/course/${courseId}`)
+  },
+
+  getCourseCategories() {
+    return apiClient.get('/course/categories')
+  },
+
+  getCourseDepartments() {
+    return apiClient.get('/course/departments')
+  },
+
+  getCourseSemesters() {
+    return apiClient.get('/course/semesters')
+  },
+
   getTeacherCourses() {
     return apiClient.get('/course/teacher-courses', {
       params: { teacherId: JSON.parse(localStorage.getItem('userInfo') || '{}').id }
     })
   },
-  
+
   selectCourse(courseId) {
     const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
-    return apiClient.post('/course/select', { 
+    return apiClient.post('/course/select', {
       courseId,
       studentId: userInfo.id
     })
   },
-  
+
+  dropCourse(courseId) {
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+    return apiClient.post('/course/drop', {
+      courseId,
+      studentId: userInfo.id
+    })
+  },
+
   getMyCourses() {
     return apiClient.get('/course/my-courses', {
       params: { studentId: JSON.parse(localStorage.getItem('userInfo') || '{}').id }

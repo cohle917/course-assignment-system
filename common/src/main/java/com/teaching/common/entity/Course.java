@@ -41,7 +41,22 @@ public class Course {
     
     @Column(name = "current_students", columnDefinition = "INT DEFAULT 0")
     private Integer currentStudents = 0;
-    
+
+    @Column(columnDefinition = "INT DEFAULT 0")
+    private Integer popularity = 0;
+
+    @Column(length = 50)
+    private String category;
+
+    @Column(length = 100)
+    private String department;
+
+    @Column(name = "cover_image", length = 255)
+    private String coverImage;
+
+    @Column(columnDefinition = "TEXT")
+    private String syllabus;
+
     @Column(length = 20)
     private String semester;
     

@@ -15,19 +15,36 @@ import java.util.Map;
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class CourseController {
-    
+
     private final CourseService courseService;
-    
+
+    // ==================== 课程查询 ====================
+
     @GetMapping("/list")
-    public Result<List<Course>> getAllCourses() {
+    public Result<List<Course>> getCourses(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String department,
+            @RequestParam(required = false) String semester,
+            @RequestParam(required = false, defaultValue = "default") String sortBy) {
         try {
-            List<Course> courses = courseService.getAllCourses();
+            List<Course> courses = courseService.getCourses(keyword, category, department, semester, sortBy);
             return Result.success(courses);
         } catch (Exception e) {
             return Result.error(e.getMessage());
         }
     }
-    
+
+    @GetMapping("/{id}")
+    public Result<Map<String, Object>> getCourseById(@PathVariable Long id) {
+        try {
+            Map<String, Object> course = courseService.getCourseById(id);
+            return Result.success(course);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
     @GetMapping("/my-courses")
     public Result<List<Course>> getMyCourses(@RequestParam Long studentId) {
         try {
@@ -37,7 +54,7 @@ public class CourseController {
             return Result.error(e.getMessage());
         }
     }
-    
+
     @GetMapping("/teacher-courses")
     public Result<List<Course>> getTeacherCourses(@RequestParam Long teacherId) {
         try {
@@ -47,7 +64,38 @@ public class CourseController {
             return Result.error(e.getMessage());
         }
     }
-    
+
+    // ==================== 筛选项 ====================
+
+    @GetMapping("/categories")
+    public Result<List<String>> getCategories() {
+        try {
+            return Result.success(courseService.getCategories());
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    @GetMapping("/departments")
+    public Result<List<String>> getDepartments() {
+        try {
+            return Result.success(courseService.getDepartments());
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    @GetMapping("/semesters")
+    public Result<List<String>> getSemesters() {
+        try {
+            return Result.success(courseService.getSemesters());
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    // ==================== 选课管理 ====================
+
     @PostMapping("/select")
     public Result<Void> selectCourse(@RequestBody Map<String, Long> request) {
         try {
@@ -62,7 +110,19 @@ public class CourseController {
             return Result.error(e.getMessage());
         }
     }
-    
+
+    @PostMapping("/drop")
+    public Result<Void> dropCourse(@RequestBody Map<String, Long> request) {
+        try {
+            Long courseId = request.get("courseId");
+            Long studentId = request.get("studentId");
+            courseService.dropCourse(courseId, studentId);
+            return Result.success(null);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
     @GetMapping("/{courseId}/students")
     public Result<List<Map<String, Object>>> getCourseStudents(@PathVariable Long courseId) {
         try {
@@ -72,7 +132,7 @@ public class CourseController {
             return Result.error(e.getMessage());
         }
     }
-    
+
     @PostMapping("/create")
     public Result<Course> createCourse(@RequestBody Course course) {
         try {
@@ -82,7 +142,7 @@ public class CourseController {
             return Result.error(e.getMessage());
         }
     }
-    
+
     @DeleteMapping("/{id}")
     public Result<Void> deleteCourse(@PathVariable Long id) {
         try {
@@ -92,9 +152,9 @@ public class CourseController {
             return Result.error(e.getMessage());
         }
     }
-    
-    // ========== 评论相关接口 ==========
-    
+
+    // ==================== 评论管理 ====================
+
     @GetMapping("/{courseId}/comments")
     public Result<List<Map<String, Object>>> getCourseComments(@PathVariable Long courseId) {
         try {
@@ -104,7 +164,7 @@ public class CourseController {
             return Result.error(e.getMessage());
         }
     }
-    
+
     @PostMapping("/{courseId}/comments")
     public Result<CourseComment> addComment(
             @PathVariable Long courseId,
@@ -116,20 +176,24 @@ public class CourseController {
             comment.setUsername(commentData.get("username").toString());
             comment.setUserName(commentData.get("userName").toString());
             comment.setUserRole(commentData.get("userRole").toString());
-            
+
             if (commentData.get("parentId") != null) {
                 comment.setParentId(Long.valueOf(commentData.get("parentId").toString()));
             }
-            
+
             comment.setContent(commentData.get("content").toString());
-            
+
+            if (commentData.get("rating") != null) {
+                comment.setRating(Integer.valueOf(commentData.get("rating").toString()));
+            }
+
             CourseComment saved = courseService.addComment(comment);
             return Result.success(saved);
         } catch (Exception e) {
             return Result.error(e.getMessage());
         }
     }
-    
+
     @DeleteMapping("/comments/{commentId}")
     public Result<Void> deleteComment(@PathVariable Long commentId) {
         try {
