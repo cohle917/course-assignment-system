@@ -4,7 +4,6 @@ import com.teaching.common.entity.Course;
 import com.teaching.common.entity.CourseComment;
 import com.teaching.common.result.Result;
 import com.teaching.course.service.CourseService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -12,11 +11,14 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/course")
-@RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class CourseController {
 
     private final CourseService courseService;
+
+    public CourseController(CourseService courseService) {
+        this.courseService = courseService;
+    }
 
     // ==================== 课程查询 ====================
 

@@ -4,7 +4,6 @@ import com.teaching.common.entity.Homework;
 import com.teaching.common.entity.HomeworkSubmission;
 import com.teaching.homework.repository.HomeworkRepository;
 import com.teaching.homework.repository.HomeworkSubmissionRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,11 +14,16 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class HomeworkService {
-    
+
     private final HomeworkRepository homeworkRepository;
     private final HomeworkSubmissionRepository submissionRepository;
+
+    public HomeworkService(HomeworkRepository homeworkRepository,
+                           HomeworkSubmissionRepository submissionRepository) {
+        this.homeworkRepository = homeworkRepository;
+        this.submissionRepository = submissionRepository;
+    }
     
     public List<Homework> getAllHomeworks() {
         return homeworkRepository.findAll();

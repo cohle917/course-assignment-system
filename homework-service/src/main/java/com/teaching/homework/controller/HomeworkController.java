@@ -3,7 +3,6 @@ package com.teaching.homework.controller;
 import com.teaching.common.entity.Homework;
 import com.teaching.common.result.Result;
 import com.teaching.homework.service.HomeworkService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -11,11 +10,14 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/homework")
-@RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class HomeworkController {
-    
+
     private final HomeworkService homeworkService;
+
+    public HomeworkController(HomeworkService homeworkService) {
+        this.homeworkService = homeworkService;
+    }
     
     @GetMapping("/list")
     public Result<List<Homework>> getAllHomeworks() {

@@ -6,6 +6,7 @@ pom.xml.versionsBackup
 pom.xml.next
 release.properties
 dependency-reduced-pom.xml
+.mvn/timing.properties
 
 # IDE
 .idea/
@@ -20,7 +21,11 @@ dependency-reduced-pom.xml
 # Node
 node_modules/
 dist/
+.vite/
+.cache/
+.npm/
 .npm
+coverage/
 
 # Logs
 logs/
@@ -29,6 +34,7 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Java
 *.class
@@ -37,3 +43,14 @@ Thumbs.db
 
 # Spring Boot
 application-local.yml
+application-*.local.yml
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Local runtime / tool state
+work/
+.claude/
+.codex/

@@ -3,7 +3,6 @@ package com.teaching.user.service;
 import com.teaching.common.entity.User;
 import com.teaching.common.entity.User.Role;
 import com.teaching.user.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -12,10 +11,13 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class UserService {
-    
+
     private final UserRepository userRepository;
+
+    public UserService(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
     
     public Map<String, Object> login(String username, String password, String role) {
         Map<String, Object> result = new HashMap<>();

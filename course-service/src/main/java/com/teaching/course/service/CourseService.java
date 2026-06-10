@@ -6,7 +6,6 @@ import com.teaching.common.entity.CourseSelection;
 import com.teaching.course.repository.CourseCommentRepository;
 import com.teaching.course.repository.CourseRepository;
 import com.teaching.course.repository.CourseSelectionRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,12 +16,19 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class CourseService {
 
     private final CourseRepository courseRepository;
     private final CourseSelectionRepository courseSelectionRepository;
     private final CourseCommentRepository courseCommentRepository;
+
+    public CourseService(CourseRepository courseRepository,
+                         CourseSelectionRepository courseSelectionRepository,
+                         CourseCommentRepository courseCommentRepository) {
+        this.courseRepository = courseRepository;
+        this.courseSelectionRepository = courseSelectionRepository;
+        this.courseCommentRepository = courseCommentRepository;
+    }
 
     @PersistenceContext
     private EntityManager entityManager;
