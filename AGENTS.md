@@ -2,6 +2,26 @@
 
 This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
+## 仓库操作约束
+
+禁止批量删除文件或目录。
+
+不要使用：
+- `del /s`
+- `rd /s`
+- `rmdir /s`
+- `Remove-Item -Recurse`
+- `rm -rf`
+
+需要删除文件时，只能一次删除一个明确路径的文件。
+
+正确示例：
+```powershell
+Remove-Item "C:\path\to\file.txt"
+```
+
+如果需要批量删除文件，应停止操作，并询问用户，让用户手动删除。
+
 ## 环境要求
 
 - JDK 11+、Maven 3.6+、Node.js 14+、MySQL 8.0+、Nacos Server（127.0.0.1:8848）

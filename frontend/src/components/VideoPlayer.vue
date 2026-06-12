@@ -2,6 +2,7 @@
   <div class="video-player">
     <div class="video-stage">
       <video
+        v-if="playMode === 'native'"
         ref="videoRef"
         class="video-element"
         :src="src"
@@ -13,7 +14,23 @@
         @ended="handleEnded"
         @error="handleError"
       />
-      <div v-if="danmakuEnabled" class="danmaku-layer">
+      <iframe
+        v-else-if="playMode === 'embed'"
+        class="video-element"
+        :src="embedUrl"
+        title="视频播放"
+        allow="autoplay; fullscreen; picture-in-picture"
+        allowfullscreen
+        referrerpolicy="no-referrer-when-downgrade"
+      />
+      <div v-else class="external-video">
+        <div class="external-video__content">
+          <p class="external-video__title">该链接不支持站内播放</p>
+          <p class="external-video__desc">请在新窗口打开视频页面观看。</p>
+          <el-button type="primary" @click="openExternal">新窗口打开</el-button>
+        </div>
+      </div>
+      <div v-if="playMode === 'native' && danmakuEnabled" class="danmaku-layer">
         <span
           v-for="item in activeDanmaku"
           :key="getDanmakuKey(item)"
@@ -25,7 +42,7 @@
       </div>
     </div>
 
-    <div class="video-controls">
+    <div v-if="playMode === 'native'" class="video-controls">
       <el-button class="control-button" size="small" @click="togglePlay">
         {{ playing ? 'Pause' : 'Play' }}
       </el-button>
@@ -75,6 +92,10 @@
         Full
       </el-button>
     </div>
+    <div v-else-if="playMode === 'embed'" class="embed-tip">
+      如果页面无法加载，说明该平台限制站内嵌入。
+      <button type="button" class="embed-tip__link" @click="openExternal">新窗口打开</button>
+    </div>
   </div>
 </template>
 
@@ -88,7 +109,7 @@ export default {
     danmakuList: { type: Array, default: () => [] },
     danmakuEnabled: { type: Boolean, default: true }
   },
-  emits: ['ready', 'timeupdate', 'pause', 'ended', 'progress-save', 'send-danmaku', 'error'],
+  emits: ['ready', 'timeupdate', 'pause', 'ended', 'progress-save', 'send-danmaku', 'error', 'modechange'],
   data() {
     return {
       playing: false,
@@ -101,6 +122,15 @@ export default {
     }
   },
   computed: {
+    playInfo() {
+      return this.resolvePlayInfo(this.src)
+    },
+    playMode() {
+      return this.playInfo.mode
+    },
+    embedUrl() {
+      return this.playInfo.embedUrl
+    },
     activeDanmaku() {
       const now = Math.floor(this.currentTime)
       return this.danmakuList
@@ -111,22 +141,95 @@ export default {
   },
   watch: {
     src() {
+      this.resetPlaybackState()
+    },
+    initialTime(value) {
+      this.applyInitialTime(value)
+    },
+    playMode: {
+      immediate: true,
+      handler(mode) {
+        this.$emit('modechange', { mode })
+      }
+    }
+  },
+  mounted() {
+    this.resetPlaybackState()
+  },
+  beforeUnmount() {
+    if (this.playMode === 'native') this.emitProgressSave()
+  },
+  methods: {
+    resetPlaybackState() {
       this.playing = false
       this.currentTime = 0
       this.duration = 0
       this.lastProgressEmitAt = 0
       this.$nextTick(() => {
-        if (this.$refs.videoRef) this.$refs.videoRef.load()
+        if (this.playMode === 'native' && this.$refs.videoRef) {
+          this.$refs.videoRef.load()
+        }
       })
     },
-    initialTime(value) {
-      this.applyInitialTime(value)
-    }
-  },
-  beforeUnmount() {
-    this.emitProgressSave()
-  },
-  methods: {
+    resolvePlayInfo(value) {
+      const rawUrl = (value || '').trim()
+      if (!rawUrl) return { mode: 'external', embedUrl: '' }
+
+      let parsed
+      try {
+        parsed = new URL(rawUrl)
+      } catch (error) {
+        return { mode: 'external', embedUrl: '' }
+      }
+
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        return { mode: 'external', embedUrl: '' }
+      }
+
+      if (this.isDirectVideoUrl(parsed)) {
+        return { mode: 'native', embedUrl: '' }
+      }
+
+      const platformEmbedUrl = this.getPlatformEmbedUrl(parsed)
+      if (platformEmbedUrl) {
+        return { mode: 'embed', embedUrl: platformEmbedUrl }
+      }
+
+      return { mode: 'embed', embedUrl: rawUrl }
+    },
+    isDirectVideoUrl(url) {
+      return /\.(mp4|webm|ogg|ogv|mov)(?:$|[?#])/i.test(url.pathname)
+    },
+    getPlatformEmbedUrl(url) {
+      const host = url.hostname.toLowerCase().replace(/^www\./, '')
+      const path = url.pathname
+
+      if (host === 'bilibili.com' || host.endsWith('.bilibili.com')) {
+        const bvid = path.match(/\/video\/(BV[\w]+)/i)?.[1] || url.searchParams.get('bvid')
+        const page = url.searchParams.get('p') || '1'
+        if (bvid) {
+          return `https://player.bilibili.com/player.html?bvid=${encodeURIComponent(bvid)}&page=${encodeURIComponent(page)}&autoplay=0`
+        }
+      }
+
+      if (host === 'youtube.com' || host.endsWith('.youtube.com') || host === 'youtu.be') {
+        const videoId = host === 'youtu.be'
+          ? path.split('/').filter(Boolean)[0]
+          : url.searchParams.get('v') || path.match(/\/embed\/([^/?#]+)/)?.[1]
+        if (videoId) {
+          return `https://www.youtube.com/embed/${encodeURIComponent(videoId)}`
+        }
+      }
+
+      if (host === 'v.qq.com' || host.endsWith('.v.qq.com')) {
+        const vid = path.match(/\/x\/page\/([^/.]+)\.html/i)?.[1] || url.searchParams.get('vid')
+        if (vid) {
+          return `https://v.qq.com/txp/iframe/player.html?vid=${encodeURIComponent(vid)}`
+        }
+      }
+
+      return ''
+    },
     handleLoadedMetadata() {
       const video = this.$refs.videoRef
       this.duration = Math.floor(video.duration || 0)
@@ -144,15 +247,18 @@ export default {
       }
     },
     emitPause() {
+      if (this.playMode !== 'native') return
       this.playing = false
       this.emitProgressSave()
       this.$emit('pause', { currentTime: this.currentTime, duration: this.duration })
     },
     emitProgressSave() {
+      if (this.playMode !== 'native') return
       this.lastProgressEmitAt = Date.now()
       this.$emit('progress-save', { currentTime: this.currentTime, duration: this.duration })
     },
     handleEnded() {
+      if (this.playMode !== 'native') return
       this.playing = false
       this.emitProgressSave()
       this.$emit('ended', { currentTime: this.currentTime, duration: this.duration })
@@ -205,7 +311,11 @@ export default {
     },
     handleError() {
       this.playing = false
-      this.$emit('error', 'Video cannot be played. Please check the video URL.')
+      this.$emit('error', '当前视频直链无法播放，请检查文件格式、跨域权限或视频地址。')
+    },
+    openExternal() {
+      const url = (this.src || '').trim()
+      if (url) window.open(url, '_blank', 'noopener,noreferrer')
     },
     getDanmakuKey(item) {
       return `${item.id || item.content}-${item.createdAt || item.timeSeconds}`
@@ -239,7 +349,33 @@ export default {
   display: block;
   width: 100%;
   height: 100%;
+  border: 0;
   object-fit: contain;
+}
+
+.external-video {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  padding: 24px;
+}
+
+.external-video__content {
+  max-width: 360px;
+  text-align: center;
+}
+
+.external-video__title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.external-video__desc {
+  margin: 0 0 18px;
+  color: #d1d5db;
 }
 
 .danmaku-layer {
@@ -300,6 +436,30 @@ export default {
   width: 96px;
 }
 
+.embed-tip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  gap: 8px;
+  padding: 8px 12px;
+  color: #d1d5db;
+  background: #1f2937;
+  font-size: 13px;
+}
+
+.embed-tip__link {
+  padding: 0;
+  border: 0;
+  color: #93c5fd;
+  background: transparent;
+  cursor: pointer;
+}
+
+.embed-tip__link:hover {
+  color: #bfdbfe;
+}
+
 @keyframes danmaku-move {
   from {
     transform: translateX(0);
@@ -322,6 +482,11 @@ export default {
 
   .speed-select {
     width: 86px;
+  }
+
+  .embed-tip {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

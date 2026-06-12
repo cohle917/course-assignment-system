@@ -287,9 +287,10 @@
                   @progress-save="handleProgressSave"
                   @send-danmaku="handlePlayerDanmaku"
                   @error="handleVideoError"
+                  @modechange="handleVideoModeChange"
                 />
                 <el-empty v-else description="请选择视频开始学习" />
-                <div v-if="selectedPlayInfo" class="danmaku-panel">
+                <div v-if="selectedPlayInfo && selectedPlaybackMode === 'native'" class="danmaku-panel">
                   <el-switch v-model="danmakuEnabled" active-text="弹幕" />
                   <el-input
                     v-model="danmakuInput"
@@ -502,7 +503,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="视频地址">
-          <el-input v-model="editingVideo.videoUrl" placeholder="https://example.com/video.mp4" />
+          <el-input v-model="editingVideo.videoUrl" placeholder="支持视频直链或可嵌入的视频页面链接" />
         </el-form-item>
         <el-form-item label="描述">
           <el-input v-model="editingVideo.description" type="textarea" :rows="3" placeholder="请输入视频简介" />
@@ -603,6 +604,7 @@ export default {
       },
       selectedVideo: null,
       selectedPlayInfo: null,
+      selectedPlaybackMode: 'native',
       videoInitialTime: 0,
       currentVideoTime: 0,
       danmakuEnabled: true,
@@ -742,6 +744,7 @@ export default {
         await this.saveCurrentVideoProgress()
         this.selectedVideo = video
         this.selectedPlayInfo = null
+        this.selectedPlaybackMode = 'native'
         this.videoInitialTime = 0
         this.currentVideoTime = 0
         const playRes = await api.getVideoPlayInfo(video.id)
@@ -761,8 +764,12 @@ export default {
       this.currentVideoTime = payload.currentTime || 0
     },
 
+    handleVideoModeChange(payload = {}) {
+      this.selectedPlaybackMode = payload.mode || 'native'
+    },
+
     async handleProgressSave(payload = {}) {
-      if (!this.selectedVideo || this.progressSaving) return
+      if (!this.selectedVideo || this.progressSaving || this.selectedPlaybackMode !== 'native') return
       const currentTime = payload.currentTime ?? this.currentVideoTime ?? 0
       const duration = payload.duration ?? this.selectedPlayInfo?.duration ?? this.selectedVideo.duration ?? 0
       this.currentVideoTime = currentTime
@@ -777,7 +784,7 @@ export default {
     },
 
     saveCurrentVideoProgress() {
-      if (!this.selectedVideo) return Promise.resolve()
+      if (!this.selectedVideo || this.selectedPlaybackMode !== 'native') return Promise.resolve()
       return this.handleProgressSave({
         currentTime: this.currentVideoTime,
         duration: this.selectedPlayInfo?.duration || this.selectedVideo.duration || 0
@@ -807,7 +814,7 @@ export default {
     },
 
     handleVideoError(message) {
-      ElMessage.error(message || '视频无法播放')
+      ElMessage.error(message || '视频无法播放，请检查地址或在新窗口打开')
     },
 
     showChapterDialog(chapter) {
