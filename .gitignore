@@ -25,6 +25,7 @@ dist/
 .cache/
 .npm/
 .npm
+frontend/.npm-cache/
 coverage/
 
 # Logs

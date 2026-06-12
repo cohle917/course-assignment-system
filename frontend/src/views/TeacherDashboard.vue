@@ -15,6 +15,7 @@
         <el-aside width="200px">
           <el-menu :default-active="activeMenu" @select="handleMenuSelect">
             <el-menu-item index="my-courses">我的课程</el-menu-item>
+            <el-menu-item index="course-management">课程管理</el-menu-item>
             <el-menu-item index="homeworks">作业管理</el-menu-item>
             <el-menu-item index="publish-homework">发布作业</el-menu-item>
           </el-menu>
@@ -40,6 +41,32 @@
                 </el-card>
               </el-col>
             </el-row>
+            <el-empty v-if="myCourses.length === 0" description="暂无课程" />
+          </div>
+
+          <div v-if="activeMenu === 'course-management'">
+            <div class="toolbar-row">
+              <h3>课程管理</h3>
+              <el-button type="primary" @click="showCourseDialog()">创建课程</el-button>
+            </div>
+            <el-table :data="myCourses" border>
+              <el-table-column prop="name" label="课程名称" />
+              <el-table-column prop="code" label="课程代码" />
+              <el-table-column prop="semester" label="学期" />
+              <el-table-column prop="status" label="状态" width="100">
+                <template #default="scope">
+                  <el-tag :type="scope.row.status === 'open' ? 'success' : 'info'">
+                    {{ scope.row.status }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="190">
+                <template #default="scope">
+                  <el-button size="small" @click="showCourseDialog(scope.row)">编辑</el-button>
+                  <el-button type="primary" size="small" @click="viewCourseDetail(scope.row.id)">内容管理</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
             <el-empty v-if="myCourses.length === 0" description="暂无课程" />
           </div>
           
@@ -120,6 +147,75 @@
         </el-table-column>
       </el-table>
     </el-dialog>
+
+    <el-dialog v-model="courseDialogVisible" :title="editingCourseId ? '编辑课程' : '创建课程'" width="680px">
+      <el-form :model="courseForm" label-width="100px">
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="课程名称">
+              <el-input v-model="courseForm.name" placeholder="请输入课程名称" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="课程代码">
+              <el-input v-model="courseForm.code" placeholder="请输入课程代码" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="学分">
+              <el-input-number v-model="courseForm.credit" :min="0" :precision="1" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="人数上限">
+              <el-input-number v-model="courseForm.maxStudents" :min="1" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="分类">
+              <el-input v-model="courseForm.category" placeholder="请输入课程分类" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="院系">
+              <el-input v-model="courseForm.department" placeholder="请输入院系" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="学期">
+              <el-input v-model="courseForm.semester" placeholder="例如 2026春季" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="状态">
+              <el-select v-model="courseForm.status">
+                <el-option label="开放" value="open" />
+                <el-option label="关闭" value="closed" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="封面地址">
+          <el-input v-model="courseForm.coverImage" placeholder="https://example.com/cover.jpg" />
+        </el-form-item>
+        <el-form-item label="课程简介">
+          <el-input v-model="courseForm.description" type="textarea" :rows="3" placeholder="请输入课程简介" />
+        </el-form-item>
+        <el-form-item label="课程大纲">
+          <el-input v-model="courseForm.syllabus" type="textarea" :rows="4" placeholder="请输入课程大纲" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="courseDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveCourse">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -144,7 +240,24 @@ export default {
       studentsDialogVisible: false,
       courseStudents: [],
       submissionsDialogVisible: false,
-      homeworkSubmissions: []
+      homeworkSubmissions: [],
+      courseDialogVisible: false,
+      editingCourseId: null,
+      courseForm: {
+        name: '',
+        code: '',
+        teacherId: null,
+        teacherName: '',
+        description: '',
+        credit: 3,
+        maxStudents: 50,
+        category: '',
+        department: '',
+        coverImage: '',
+        syllabus: '',
+        semester: '',
+        status: 'open'
+      }
     }
   },
   mounted() {
@@ -161,7 +274,7 @@ export default {
     
     handleMenuSelect(index) {
       this.activeMenu = index
-      if (index === 'my-courses') {
+      if (index === 'my-courses' || index === 'course-management') {
         this.loadMyCourses()
       } else if (index === 'homeworks') {
         this.loadHomeworks()
@@ -207,6 +320,50 @@ export default {
         this.loadHomeworks()
       } catch (error) {
         ElMessage.error('发布失败: ' + (error.message || '未知错误'))
+      }
+    },
+
+    showCourseDialog(course) {
+      this.editingCourseId = course?.id || null
+      this.courseForm = course ? { ...course } : {
+        name: '',
+        code: '',
+        teacherId: this.userInfo.id,
+        teacherName: this.userInfo.name || this.userInfo.username,
+        description: '',
+        credit: 3,
+        maxStudents: 50,
+        category: '',
+        department: this.userInfo.department || '',
+        coverImage: '',
+        syllabus: '',
+        semester: '',
+        status: 'open'
+      }
+      this.courseDialogVisible = true
+    },
+
+    async saveCourse() {
+      if (!this.courseForm.name?.trim() || !this.courseForm.code?.trim()) {
+        ElMessage.warning('请输入课程名称和课程代码')
+        return
+      }
+      try {
+        const payload = {
+          ...this.courseForm,
+          teacherId: this.courseForm.teacherId || this.userInfo.id,
+          teacherName: this.courseForm.teacherName || this.userInfo.name || this.userInfo.username
+        }
+        if (this.editingCourseId) {
+          await api.updateCourse(this.editingCourseId, payload)
+        } else {
+          await api.createCourse(payload)
+        }
+        ElMessage.success('保存成功')
+        this.courseDialogVisible = false
+        this.loadMyCourses()
+      } catch (error) {
+        ElMessage.error('保存课程失败: ' + (error.message || '未知错误'))
       }
     },
     
@@ -279,7 +436,26 @@ export default {
   margin-top: 10px;
 }
 
+.toolbar-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.toolbar-row h3 {
+  margin: 0;
+}
+
 h3 {
   margin-bottom: 20px;
+}
+
+@media (max-width: 900px) {
+  .toolbar-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 </style>

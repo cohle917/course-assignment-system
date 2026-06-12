@@ -41,6 +41,15 @@ apiClient.interceptors.response.use(
   }
 )
 
+function getLocalUser() {
+  try {
+    return JSON.parse(localStorage.getItem('userInfo') || '{}')
+  } catch (e) {
+    console.error('瑙ｆ瀽鐢ㄦ埛淇℃伅澶辫触:', e)
+    return {}
+  }
+}
+
 export default {
   login(username, password, role) {
     return apiClient.post('/user/login', { username, password, role })
@@ -58,6 +67,21 @@ export default {
     return apiClient.get(`/course/${courseId}`)
   },
 
+  createCourse(data) {
+    return apiClient.post('/course/create', data)
+  },
+
+  updateCourse(courseId, data) {
+    return apiClient.put(`/course/${courseId}`, data)
+  },
+
+  getLearningContent(courseId) {
+    const user = getLocalUser()
+    return apiClient.get(`/course/${courseId}/learning-content`, {
+      params: { userId: user.id, role: user.role }
+    })
+  },
+
   getCourseCategories() {
     return apiClient.get('/course/categories')
   },
@@ -72,12 +96,12 @@ export default {
 
   getTeacherCourses() {
     return apiClient.get('/course/teacher-courses', {
-      params: { teacherId: JSON.parse(localStorage.getItem('userInfo') || '{}').id }
+      params: { teacherId: getLocalUser().id }
     })
   },
 
   selectCourse(courseId) {
-    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+    const userInfo = getLocalUser()
     return apiClient.post('/course/select', {
       courseId,
       studentId: userInfo.id
@@ -85,7 +109,7 @@ export default {
   },
 
   dropCourse(courseId) {
-    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+    const userInfo = getLocalUser()
     return apiClient.post('/course/drop', {
       courseId,
       studentId: userInfo.id
@@ -94,7 +118,7 @@ export default {
 
   getMyCourses() {
     return apiClient.get('/course/my-courses', {
-      params: { studentId: JSON.parse(localStorage.getItem('userInfo') || '{}').id }
+      params: { studentId: getLocalUser().id }
     })
   },
   
@@ -104,12 +128,12 @@ export default {
   
   getMyHomeworks() {
     return apiClient.get('/homework/my-homeworks', {
-      params: { studentId: JSON.parse(localStorage.getItem('userInfo') || '{}').id }
+      params: { studentId: getLocalUser().id }
     })
   },
   
   submitHomework(homeworkId, content) {
-    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+    const userInfo = getLocalUser()
     return apiClient.post('/homework/submit', { 
       homeworkId, 
       content,
@@ -125,6 +149,131 @@ export default {
     return apiClient.get(`/course/${courseId}/students`)
   },
   
+  // Course content APIs
+  createChapter(courseId, data) {
+    const user = getLocalUser()
+    return apiClient.post(`/course/${courseId}/chapters`, data, {
+      params: { teacherId: user.id }
+    })
+  },
+
+  updateChapter(chapterId, data) {
+    const user = getLocalUser()
+    return apiClient.put(`/course/chapters/${chapterId}`, data, {
+      params: { teacherId: user.id }
+    })
+  },
+
+  deleteChapter(chapterId) {
+    const user = getLocalUser()
+    return apiClient.delete(`/course/chapters/${chapterId}`, {
+      params: { teacherId: user.id }
+    })
+  },
+
+  createVideo(courseId, data) {
+    const user = getLocalUser()
+    return apiClient.post(`/course/${courseId}/videos`, data, {
+      params: { teacherId: user.id }
+    })
+  },
+
+  updateVideo(videoId, data) {
+    const user = getLocalUser()
+    return apiClient.put(`/course/videos/${videoId}`, data, {
+      params: { teacherId: user.id }
+    })
+  },
+
+  deleteVideo(videoId) {
+    const user = getLocalUser()
+    return apiClient.delete(`/course/videos/${videoId}`, {
+      params: { teacherId: user.id }
+    })
+  },
+
+  getVideoPlayInfo(videoId) {
+    const user = getLocalUser()
+    return apiClient.get(`/course/videos/${videoId}/play-info`, {
+      params: { userId: user.id, role: user.role }
+    })
+  },
+
+  saveVideoProgress(videoId, lastPosition, duration) {
+    const user = getLocalUser()
+    return apiClient.post(`/course/videos/${videoId}/progress`, {
+      lastPosition,
+      duration
+    }, {
+      params: { studentId: user.id }
+    })
+  },
+
+  getVideoProgress(videoId) {
+    const user = getLocalUser()
+    return apiClient.get(`/course/videos/${videoId}/progress`, {
+      params: { studentId: user.id }
+    })
+  },
+
+  getVideoDanmaku(videoId) {
+    const user = getLocalUser()
+    return apiClient.get(`/course/videos/${videoId}/danmaku`, {
+      params: { userId: user.id, role: user.role }
+    })
+  },
+
+  sendVideoDanmaku(videoId, data) {
+    const user = getLocalUser()
+    return apiClient.post(`/course/videos/${videoId}/danmaku`, {
+      ...data,
+      studentId: user.id,
+      studentName: user.name || user.username
+    })
+  },
+
+  createMaterial(courseId, data) {
+    const user = getLocalUser()
+    return apiClient.post(`/course/${courseId}/materials`, data, {
+      params: { teacherId: user.id }
+    })
+  },
+
+  updateMaterial(id, data) {
+    const user = getLocalUser()
+    return apiClient.put(`/course/materials/${id}`, data, {
+      params: { teacherId: user.id }
+    })
+  },
+
+  deleteMaterial(id) {
+    const user = getLocalUser()
+    return apiClient.delete(`/course/materials/${id}`, {
+      params: { teacherId: user.id }
+    })
+  },
+
+  createAnnouncement(courseId, data) {
+    const user = getLocalUser()
+    return apiClient.post(`/course/${courseId}/announcements`, data, {
+      params: { teacherId: user.id }
+    })
+  },
+
+  updateAnnouncement(id, data) {
+    const user = getLocalUser()
+    return apiClient.put(`/course/announcements/${id}`, data, {
+      params: { teacherId: user.id }
+    })
+  },
+
+  deleteAnnouncement(id) {
+    const user = getLocalUser()
+    return apiClient.delete(`/course/announcements/${id}`, {
+      params: { teacherId: user.id }
+    })
+  },
+
   // 评论相关
   getCourseComments(courseId) {
     return apiClient.get(`/course/${courseId}/comments`)

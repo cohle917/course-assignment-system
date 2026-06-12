@@ -217,6 +217,94 @@
             </el-card>
           </el-tab-pane>
 
+          <el-tab-pane v-if="isStudent" label="课程学习" name="learning">
+            <div class="learning-layout">
+              <aside class="learning-sidebar">
+                <div v-if="latestAnnouncement" class="announcement-strip">
+                  <strong>{{ latestAnnouncement.title }}</strong>
+                  <p>{{ latestAnnouncement.content }}</p>
+                </div>
+                <div v-for="chapter in chapterTree" :key="chapter.id" class="chapter-block">
+                  <h4>{{ chapter.title }}</h4>
+                  <button
+                    v-for="video in chapter.videos"
+                    :key="video.id"
+                    class="lesson-row"
+                    :class="{ active: selectedVideo && selectedVideo.id === video.id }"
+                    type="button"
+                    @click="selectVideo(video)"
+                  >
+                    {{ video.title }}
+                  </button>
+                  <a
+                    v-for="material in chapter.materials"
+                    :key="material.id"
+                    class="material-row"
+                    :href="material.resourceUrl"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {{ material.title }}
+                  </a>
+                  <div v-for="child in chapter.children" :key="child.id" class="child-chapter">
+                    <h5>{{ child.title }}</h5>
+                    <button
+                      v-for="video in child.videos"
+                      :key="video.id"
+                      class="lesson-row"
+                      :class="{ active: selectedVideo && selectedVideo.id === video.id }"
+                      type="button"
+                      @click="selectVideo(video)"
+                    >
+                      {{ video.title }}
+                    </button>
+                    <a
+                      v-for="material in child.materials"
+                      :key="material.id"
+                      class="material-row"
+                      :href="material.resourceUrl"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {{ material.title }}
+                    </a>
+                  </div>
+                </div>
+                <el-empty v-if="chapterTree.length === 0" description="暂无学习内容" />
+              </aside>
+              <section class="learning-player">
+                <VideoPlayer
+                  v-if="selectedPlayInfo"
+                  :key="selectedPlayInfo.videoId || selectedVideo.id"
+                  :src="selectedPlayInfo.videoUrl"
+                  :poster="selectedPlayInfo.poster"
+                  :initial-time="videoInitialTime"
+                  :danmaku-list="danmakuList"
+                  :danmaku-enabled="danmakuEnabled"
+                  @timeupdate="handleVideoTimeUpdate"
+                  @pause="handleProgressSave"
+                  @ended="handleProgressSave"
+                  @progress-save="handleProgressSave"
+                  @send-danmaku="handlePlayerDanmaku"
+                  @error="handleVideoError"
+                />
+                <el-empty v-else description="请选择视频开始学习" />
+                <div v-if="selectedPlayInfo" class="danmaku-panel">
+                  <el-switch v-model="danmakuEnabled" active-text="弹幕" />
+                  <el-input
+                    v-model="danmakuInput"
+                    maxlength="200"
+                    show-word-limit
+                    placeholder="发送弹幕"
+                    aria-label="发送弹幕"
+                    @keyup.enter="sendDanmaku"
+                  />
+                  <el-button type="primary" @click="sendDanmaku">发送</el-button>
+                </div>
+              </section>
+            </div>
+          </el-tab-pane>
+
           <!-- 学生端：课程作业 -->
           <el-tab-pane v-if="isStudent" label="课程作业" name="homeworks">
             <el-card>
@@ -248,6 +336,89 @@
               </el-table>
               <el-empty v-if="courseHomeworks.length === 0" description="暂无作业" />
             </el-card>
+          </el-tab-pane>
+
+          <el-tab-pane v-if="isTeacher" label="内容管理" name="content-manage">
+            <div class="manage-grid">
+              <el-card>
+                <template #header>
+                  <div class="card-header">
+                    <h4>章节</h4>
+                    <el-button type="primary" size="small" @click="showChapterDialog()">新增章节</el-button>
+                  </div>
+                </template>
+                <el-table :data="learningContent.chapters" border>
+                  <el-table-column prop="title" label="标题" />
+                  <el-table-column prop="parentId" label="父章节" width="100" />
+                  <el-table-column prop="sortOrder" label="排序" width="90" />
+                  <el-table-column label="操作" width="160">
+                    <template #default="scope">
+                      <el-button size="small" @click="showChapterDialog(scope.row)">编辑</el-button>
+                      <el-button type="danger" size="small" @click="deleteChapter(scope.row.id)">删除</el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </el-card>
+
+              <el-card>
+                <template #header>
+                  <div class="card-header">
+                    <h4>视频</h4>
+                    <el-button type="primary" size="small" @click="showVideoDialog()">新增视频</el-button>
+                  </div>
+                </template>
+                <el-table :data="learningContent.videos" border>
+                  <el-table-column prop="title" label="标题" />
+                  <el-table-column prop="status" label="状态" width="100" />
+                  <el-table-column prop="duration" label="时长" width="90" />
+                  <el-table-column label="操作" width="160">
+                    <template #default="scope">
+                      <el-button size="small" @click="showVideoDialog(scope.row)">编辑</el-button>
+                      <el-button type="danger" size="small" @click="deleteVideo(scope.row.id)">删除</el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </el-card>
+
+              <el-card>
+                <template #header>
+                  <div class="card-header">
+                    <h4>课件</h4>
+                    <el-button type="primary" size="small" @click="showMaterialDialog()">新增课件</el-button>
+                  </div>
+                </template>
+                <el-table :data="learningContent.materials" border>
+                  <el-table-column prop="title" label="标题" />
+                  <el-table-column prop="fileType" label="类型" width="100" />
+                  <el-table-column prop="resourceUrl" label="地址" show-overflow-tooltip />
+                  <el-table-column label="操作" width="160">
+                    <template #default="scope">
+                      <el-button size="small" @click="showMaterialDialog(scope.row)">编辑</el-button>
+                      <el-button type="danger" size="small" @click="deleteMaterial(scope.row.id)">删除</el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </el-card>
+
+              <el-card>
+                <template #header>
+                  <div class="card-header">
+                    <h4>公告</h4>
+                    <el-button type="primary" size="small" @click="showAnnouncementDialog()">发布公告</el-button>
+                  </div>
+                </template>
+                <el-table :data="learningContent.announcements" border>
+                  <el-table-column prop="title" label="标题" />
+                  <el-table-column prop="publishedAt" label="发布时间" width="180" />
+                  <el-table-column label="操作" width="160">
+                    <template #default="scope">
+                      <el-button size="small" @click="showAnnouncementDialog(scope.row)">编辑</el-button>
+                      <el-button type="danger" size="small" @click="deleteAnnouncement(scope.row.id)">删除</el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </el-card>
+            </div>
           </el-tab-pane>
 
           <!-- 教师端：选课学生 -->
@@ -293,6 +464,109 @@
         <el-button type="primary" @click="handleSubmitHomework">提交</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="chapterDialogVisible" :title="editingChapter.id ? '编辑章节' : '新增章节'" width="520px">
+      <el-form :model="editingChapter" label-width="90px">
+        <el-form-item label="标题">
+          <el-input v-model="editingChapter.title" placeholder="请输入章节标题" />
+        </el-form-item>
+        <el-form-item label="父章节">
+          <el-select v-model="editingChapter.parentId" clearable placeholder="顶级章节">
+            <el-option
+              v-for="chapter in rootChapterOptions"
+              :key="chapter.id"
+              :label="chapter.title"
+              :value="chapter.id"
+              :disabled="chapter.id === editingChapter.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="排序">
+          <el-input-number v-model="editingChapter.sortOrder" :min="0" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="chapterDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveChapter">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="videoDialogVisible" :title="editingVideo.id ? '编辑视频' : '新增视频'" width="640px">
+      <el-form :model="editingVideo" label-width="90px">
+        <el-form-item label="标题">
+          <el-input v-model="editingVideo.title" placeholder="请输入视频标题" />
+        </el-form-item>
+        <el-form-item label="章节">
+          <el-select v-model="editingVideo.chapterId" clearable placeholder="请选择章节">
+            <el-option v-for="chapter in chapterOptions" :key="chapter.id" :label="chapter.title" :value="chapter.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="视频地址">
+          <el-input v-model="editingVideo.videoUrl" placeholder="https://example.com/video.mp4" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="editingVideo.description" type="textarea" :rows="3" placeholder="请输入视频简介" />
+        </el-form-item>
+        <el-form-item label="时长">
+          <el-input-number v-model="editingVideo.duration" :min="0" />
+        </el-form-item>
+        <el-form-item label="排序">
+          <el-input-number v-model="editingVideo.sortOrder" :min="0" />
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="editingVideo.status">
+            <el-option label="草稿" value="draft" />
+            <el-option label="已发布" value="published" />
+            <el-option label="隐藏" value="hidden" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="videoDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveVideo">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="materialDialogVisible" :title="editingMaterial.id ? '编辑课件' : '新增课件'" width="560px">
+      <el-form :model="editingMaterial" label-width="90px">
+        <el-form-item label="标题">
+          <el-input v-model="editingMaterial.title" placeholder="请输入课件标题" />
+        </el-form-item>
+        <el-form-item label="章节">
+          <el-select v-model="editingMaterial.chapterId" clearable placeholder="请选择章节">
+            <el-option v-for="chapter in chapterOptions" :key="chapter.id" :label="chapter.title" :value="chapter.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="类型">
+          <el-input v-model="editingMaterial.fileType" placeholder="PDF / PPT / DOC / URL" />
+        </el-form-item>
+        <el-form-item label="资源地址">
+          <el-input v-model="editingMaterial.resourceUrl" placeholder="https://example.com/material.pdf" />
+        </el-form-item>
+        <el-form-item label="排序">
+          <el-input-number v-model="editingMaterial.sortOrder" :min="0" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="materialDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveMaterial">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="announcementDialogVisible" :title="editingAnnouncement.id ? '编辑公告' : '发布公告'" width="560px">
+      <el-form :model="editingAnnouncement" label-width="90px">
+        <el-form-item label="标题">
+          <el-input v-model="editingAnnouncement.title" placeholder="请输入公告标题" />
+        </el-form-item>
+        <el-form-item label="内容">
+          <el-input v-model="editingAnnouncement.content" type="textarea" :rows="5" placeholder="请输入公告内容" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="announcementDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveAnnouncement">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -300,10 +574,11 @@
 import { ElMessage } from 'element-plus'
 import api from '../api'
 import StarRating from '../components/StarRating.vue'
+import VideoPlayer from '../components/VideoPlayer.vue'
 
 export default {
   name: 'CourseDetail',
-  components: { StarRating },
+  components: { StarRating, VideoPlayer },
   data() {
     return {
       loading: false,
@@ -319,7 +594,37 @@ export default {
       newComment: '',
       reviewRating: 0,
       replyContent: '',
-      replyingTo: null
+      replyingTo: null,
+      learningContent: {
+        chapters: [],
+        videos: [],
+        materials: [],
+        announcements: []
+      },
+      selectedVideo: null,
+      selectedPlayInfo: null,
+      videoInitialTime: 0,
+      currentVideoTime: 0,
+      danmakuEnabled: true,
+      danmakuList: [],
+      danmakuInput: '',
+      progressSaving: false,
+      chapterDialogVisible: false,
+      videoDialogVisible: false,
+      materialDialogVisible: false,
+      announcementDialogVisible: false,
+      editingChapter: { title: '', parentId: null, sortOrder: 0 },
+      editingVideo: {
+        title: '',
+        description: '',
+        chapterId: null,
+        videoUrl: '',
+        duration: 0,
+        sortOrder: 0,
+        status: 'draft'
+      },
+      editingMaterial: { title: '', fileType: '', resourceUrl: '', chapterId: null, sortOrder: 0 },
+      editingAnnouncement: { title: '', content: '' }
     }
   },
   computed: {
@@ -331,12 +636,48 @@ export default {
     },
     courseId() {
       return this.$route.params.courseId
+    },
+    latestAnnouncement() {
+      return this.learningContent.announcements[0] || null
+    },
+    rootChapterOptions() {
+      return this.learningContent.chapters.filter(chapter => !chapter.parentId)
+    },
+    chapterOptions() {
+      const rootIds = new Set(this.rootChapterOptions.map(chapter => chapter.id))
+      return this.learningContent.chapters.map(chapter => ({
+        ...chapter,
+        title: chapter.parentId && rootIds.has(chapter.parentId) ? `  ${chapter.title}` : chapter.title
+      }))
+    },
+    chapterTree() {
+      const videos = this.learningContent.videos || []
+      const materials = this.learningContent.materials || []
+      return (this.learningContent.chapters || [])
+        .filter(chapter => !chapter.parentId)
+        .map(chapter => ({
+          ...chapter,
+          children: (this.learningContent.chapters || [])
+            .filter(child => child.parentId === chapter.id)
+            .map(child => ({
+              ...child,
+              videos: videos.filter(video => video.chapterId === child.id && video.status === 'published'),
+              materials: materials.filter(material => material.chapterId === child.id)
+            })),
+          videos: videos.filter(video => video.chapterId === chapter.id && video.status === 'published'),
+          materials: materials.filter(material => material.chapterId === chapter.id)
+        }))
     }
   },
   mounted() {
     this.loadUserInfo()
     this.loadCourseDetail()
     this.loadComments()
+    window.addEventListener('beforeunload', this.saveCurrentVideoProgress)
+  },
+  beforeUnmount() {
+    window.removeEventListener('beforeunload', this.saveCurrentVideoProgress)
+    this.saveCurrentVideoProgress()
   },
   methods: {
     loadUserInfo() {
@@ -358,6 +699,7 @@ export default {
         // 加载角色相关内容
         if (this.isTeacher) this.loadCourseStudents()
         if (this.isStudent) this.loadCourseHomeworks()
+        if (this.isStudent || this.isTeacher) this.loadLearningContent()
       } catch (error) {
         console.error('加载课程详情失败:', error)
         ElMessage.error('加载课程详情失败')
@@ -382,6 +724,231 @@ export default {
         this.courseHomeworks = allHomeworks.filter(h => h.courseName === this.course?.name)
       } catch (error) {
         console.error('加载作业列表失败:', error)
+      }
+    },
+
+    async loadLearningContent() {
+      try {
+        const result = await api.getLearningContent(this.courseId)
+        this.learningContent = result.data || { chapters: [], videos: [], materials: [], announcements: [] }
+      } catch (error) {
+        console.error('加载课程学习内容失败:', error)
+        ElMessage.error('加载课程学习内容失败')
+      }
+    },
+
+    async selectVideo(video) {
+      try {
+        await this.saveCurrentVideoProgress()
+        this.selectedVideo = video
+        this.selectedPlayInfo = null
+        this.videoInitialTime = 0
+        this.currentVideoTime = 0
+        const playRes = await api.getVideoPlayInfo(video.id)
+        this.selectedPlayInfo = playRes.data
+        const progressRes = await api.getVideoProgress(video.id)
+        this.videoInitialTime = progressRes.data?.lastPosition || 0
+        this.currentVideoTime = this.videoInitialTime
+        const danmakuRes = await api.getVideoDanmaku(video.id)
+        this.danmakuList = danmakuRes.data || []
+      } catch (error) {
+        console.error('加载视频失败:', error)
+        ElMessage.error('加载视频失败')
+      }
+    },
+
+    handleVideoTimeUpdate(payload = {}) {
+      this.currentVideoTime = payload.currentTime || 0
+    },
+
+    async handleProgressSave(payload = {}) {
+      if (!this.selectedVideo || this.progressSaving) return
+      const currentTime = payload.currentTime ?? this.currentVideoTime ?? 0
+      const duration = payload.duration ?? this.selectedPlayInfo?.duration ?? this.selectedVideo.duration ?? 0
+      this.currentVideoTime = currentTime
+      this.progressSaving = true
+      try {
+        await api.saveVideoProgress(this.selectedVideo.id, Math.floor(currentTime), Math.floor(duration))
+      } catch (error) {
+        console.warn('保存播放进度失败:', error)
+      } finally {
+        this.progressSaving = false
+      }
+    },
+
+    saveCurrentVideoProgress() {
+      if (!this.selectedVideo) return Promise.resolve()
+      return this.handleProgressSave({
+        currentTime: this.currentVideoTime,
+        duration: this.selectedPlayInfo?.duration || this.selectedVideo.duration || 0
+      })
+    },
+
+    handlePlayerDanmaku(payload = {}) {
+      return this.sendDanmaku(payload)
+    },
+
+    async sendDanmaku(payload = {}) {
+      const content = (payload.content || this.danmakuInput || '').trim()
+      if (!this.selectedVideo || !content) return
+      try {
+        await api.sendVideoDanmaku(this.selectedVideo.id, {
+          content,
+          timeSeconds: Math.floor(payload.timeSeconds ?? this.currentVideoTime ?? 0),
+          color: payload.color || '#ffffff'
+        })
+        this.danmakuInput = ''
+        const result = await api.getVideoDanmaku(this.selectedVideo.id)
+        this.danmakuList = result.data || []
+      } catch (error) {
+        console.error('发送弹幕失败:', error)
+        ElMessage.error('发送弹幕失败')
+      }
+    },
+
+    handleVideoError(message) {
+      ElMessage.error(message || '视频无法播放')
+    },
+
+    showChapterDialog(chapter) {
+      this.editingChapter = chapter ? { ...chapter } : { title: '', parentId: null, sortOrder: 0 }
+      this.chapterDialogVisible = true
+    },
+
+    async saveChapter() {
+      if (!this.editingChapter.title?.trim()) {
+        ElMessage.warning('请输入章节标题')
+        return
+      }
+      try {
+        if (this.editingChapter.id) {
+          await api.updateChapter(this.editingChapter.id, this.editingChapter)
+        } else {
+          await api.createChapter(this.courseId, this.editingChapter)
+        }
+        ElMessage.success('保存成功')
+        this.chapterDialogVisible = false
+        this.loadLearningContent()
+      } catch (error) {
+        ElMessage.error('保存章节失败')
+      }
+    },
+
+    async deleteChapter(id) {
+      try {
+        await this.$confirm('确定删除这个章节吗？', '提示', { type: 'warning' })
+        await api.deleteChapter(id)
+        ElMessage.success('删除成功')
+        this.loadLearningContent()
+      } catch (error) {
+        if (error !== 'cancel') ElMessage.error('删除章节失败')
+      }
+    },
+
+    showVideoDialog(video) {
+      this.editingVideo = video
+        ? { ...video }
+        : { title: '', description: '', chapterId: null, videoUrl: '', duration: 0, sortOrder: 0, status: 'draft' }
+      this.videoDialogVisible = true
+    },
+
+    async saveVideo() {
+      if (!this.editingVideo.title?.trim() || !this.editingVideo.videoUrl?.trim()) {
+        ElMessage.warning('请输入视频标题和地址')
+        return
+      }
+      try {
+        if (this.editingVideo.id) {
+          await api.updateVideo(this.editingVideo.id, this.editingVideo)
+        } else {
+          await api.createVideo(this.courseId, this.editingVideo)
+        }
+        ElMessage.success('保存成功')
+        this.videoDialogVisible = false
+        this.loadLearningContent()
+      } catch (error) {
+        ElMessage.error('保存视频失败')
+      }
+    },
+
+    async deleteVideo(id) {
+      try {
+        await this.$confirm('确定删除这个视频吗？', '提示', { type: 'warning' })
+        await api.deleteVideo(id)
+        ElMessage.success('删除成功')
+        this.loadLearningContent()
+      } catch (error) {
+        if (error !== 'cancel') ElMessage.error('删除视频失败')
+      }
+    },
+
+    showMaterialDialog(material) {
+      this.editingMaterial = material ? { ...material } : { title: '', fileType: '', resourceUrl: '', chapterId: null, sortOrder: 0 }
+      this.materialDialogVisible = true
+    },
+
+    async saveMaterial() {
+      if (!this.editingMaterial.title?.trim() || !this.editingMaterial.resourceUrl?.trim()) {
+        ElMessage.warning('请输入课件标题和资源地址')
+        return
+      }
+      try {
+        if (this.editingMaterial.id) {
+          await api.updateMaterial(this.editingMaterial.id, this.editingMaterial)
+        } else {
+          await api.createMaterial(this.courseId, this.editingMaterial)
+        }
+        ElMessage.success('保存成功')
+        this.materialDialogVisible = false
+        this.loadLearningContent()
+      } catch (error) {
+        ElMessage.error('保存课件失败')
+      }
+    },
+
+    async deleteMaterial(id) {
+      try {
+        await this.$confirm('确定删除这个课件吗？', '提示', { type: 'warning' })
+        await api.deleteMaterial(id)
+        ElMessage.success('删除成功')
+        this.loadLearningContent()
+      } catch (error) {
+        if (error !== 'cancel') ElMessage.error('删除课件失败')
+      }
+    },
+
+    showAnnouncementDialog(announcement) {
+      this.editingAnnouncement = announcement ? { ...announcement } : { title: '', content: '' }
+      this.announcementDialogVisible = true
+    },
+
+    async saveAnnouncement() {
+      if (!this.editingAnnouncement.title?.trim() || !this.editingAnnouncement.content?.trim()) {
+        ElMessage.warning('请输入公告标题和内容')
+        return
+      }
+      try {
+        if (this.editingAnnouncement.id) {
+          await api.updateAnnouncement(this.editingAnnouncement.id, this.editingAnnouncement)
+        } else {
+          await api.createAnnouncement(this.courseId, this.editingAnnouncement)
+        }
+        ElMessage.success('保存成功')
+        this.announcementDialogVisible = false
+        this.loadLearningContent()
+      } catch (error) {
+        ElMessage.error('保存公告失败')
+      }
+    },
+
+    async deleteAnnouncement(id) {
+      try {
+        await this.$confirm('确定删除这条公告吗？', '提示', { type: 'warning' })
+        await api.deleteAnnouncement(id)
+        ElMessage.success('删除成功')
+        this.loadLearningContent()
+      } catch (error) {
+        if (error !== 'cancel') ElMessage.error('删除公告失败')
       }
     },
 
@@ -606,4 +1173,27 @@ export default {
 .card-header { display: flex; justify-content: space-between; align-items: center; }
 .card-header h4 { margin: 0; }
 .student-count { color: #909399; }
+
+.learning-layout { display: grid; grid-template-columns: 280px 1fr; gap: 16px; }
+.learning-sidebar { background: #fff; border: 1px solid #ebeef5; border-radius: 6px; padding: 12px; max-height: 620px; overflow: auto; }
+.announcement-strip { border-left: 3px solid #409EFF; padding-left: 10px; margin-bottom: 14px; color: #303133; }
+.announcement-strip p { margin: 6px 0 0; color: #606266; font-size: 13px; line-height: 1.5; }
+.chapter-block { margin-bottom: 14px; }
+.chapter-block h4 { margin: 0 0 8px; color: #303133; }
+.lesson-row, .material-row { display: block; width: 100%; text-align: left; padding: 8px 10px; margin-bottom: 6px; border: 1px solid #e4e7ed; border-radius: 4px; background: #f9fafb; color: #303133; text-decoration: none; cursor: pointer; }
+.lesson-row.active { border-color: #409EFF; color: #409EFF; background: #ecf5ff; }
+.material-row { color: #606266; }
+.child-chapter { margin-left: 12px; padding-left: 10px; border-left: 2px solid #ebeef5; }
+.child-chapter h5 { margin: 8px 0 6px; color: #606266; }
+.learning-player { min-width: 0; }
+.danmaku-panel { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; margin-top: 12px; }
+.manage-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.manage-grid .el-card { min-width: 0; }
+
+@media (max-width: 900px) {
+  .learning-layout { grid-template-columns: 1fr; }
+  .learning-sidebar { max-height: none; }
+  .manage-grid { grid-template-columns: 1fr; }
+  .danmaku-panel { grid-template-columns: 1fr; }
+}
 </style>
