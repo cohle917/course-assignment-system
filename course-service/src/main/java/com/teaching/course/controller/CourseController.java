@@ -178,6 +178,18 @@ public class CourseController {
         }
     }
 
+    @GetMapping("/{courseId}/progress/summary")
+    public Result<Map<String, Object>> getCourseProgressSummary(
+            @PathVariable Long courseId,
+            @RequestParam Long userId,
+            @RequestParam String role) {
+        try {
+            return Result.success(courseService.getCourseProgressSummary(courseId, userId, role));
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
     @PostMapping("/{courseId}/chapters")
     public Result<CourseChapter> saveChapter(
             @PathVariable Long courseId,

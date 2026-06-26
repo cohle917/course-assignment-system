@@ -218,6 +218,23 @@
           </el-tab-pane>
 
           <el-tab-pane v-if="isStudent" label="课程学习" name="learning">
+            <div v-if="studentProgress" class="progress-board">
+              <div class="progress-main">
+                <div>
+                  <span class="progress-label">学习完成度</span>
+                  <strong>{{ studentProgress.completionRate || 0 }}%</strong>
+                </div>
+                <el-progress :percentage="studentProgress.completionRate || 0" :stroke-width="10" />
+              </div>
+              <div class="progress-metric">
+                <span>已完成</span>
+                <strong>{{ studentProgress.completedVideos || 0 }}/{{ studentProgress.totalVideos || 0 }}</strong>
+              </div>
+              <div class="progress-metric">
+                <span>最近学习</span>
+                <strong>{{ formatDateTime(studentProgress.lastLearnedAt) || '暂无' }}</strong>
+              </div>
+            </div>
             <div class="learning-layout">
               <aside class="learning-sidebar">
                 <div v-if="latestAnnouncement" class="announcement-strip">
@@ -234,7 +251,10 @@
                     type="button"
                     @click="selectVideo(video)"
                   >
-                    {{ video.title }}
+                    <span class="lesson-title">{{ video.title }}</span>
+                    <el-tag size="small" :type="getProgressTagType(getVideoProgressInfo(video.id).status)">
+                      {{ getProgressStatusLabel(getVideoProgressInfo(video.id).status) }}
+                    </el-tag>
                   </button>
                   <a
                     v-for="material in chapter.materials"
@@ -256,7 +276,10 @@
                       type="button"
                       @click="selectVideo(video)"
                     >
-                      {{ video.title }}
+                      <span class="lesson-title">{{ video.title }}</span>
+                      <el-tag size="small" :type="getProgressTagType(getVideoProgressInfo(video.id).status)">
+                        {{ getProgressStatusLabel(getVideoProgressInfo(video.id).status) }}
+                      </el-tag>
                     </button>
                     <a
                       v-for="material in child.materials"
@@ -446,6 +469,63 @@
               <el-empty v-if="courseStudents.length === 0" description="暂无选课学生" />
             </el-card>
           </el-tab-pane>
+
+          <el-tab-pane v-if="isTeacher" label="学习统计" name="learning-progress">
+            <div v-if="teacherProgressOverview" class="teacher-progress">
+              <div class="progress-overview-grid">
+                <div class="overview-cell">
+                  <span>平均完成度</span>
+                  <strong>{{ teacherProgressOverview.averageCompletionRate || 0 }}%</strong>
+                </div>
+                <div class="overview-cell">
+                  <span>已完成学生</span>
+                  <strong>{{ teacherProgressOverview.completedStudents || 0 }}</strong>
+                </div>
+                <div class="overview-cell">
+                  <span>学习中</span>
+                  <strong>{{ teacherProgressOverview.inProgressStudents || 0 }}</strong>
+                </div>
+                <div class="overview-cell">
+                  <span>未开始</span>
+                  <strong>{{ teacherProgressOverview.notStartedStudents || 0 }}</strong>
+                </div>
+              </div>
+              <el-card class="progress-table-card">
+                <template #header>
+                  <div class="card-header">
+                    <h4>学生学习进度</h4>
+                    <span class="student-count">共 {{ teacherProgressStudents.length }} 人</span>
+                  </div>
+                </template>
+                <el-table :data="teacherProgressStudents" border>
+                  <el-table-column label="姓名" min-width="120">
+                    <template #default="scope">
+                      {{ scope.row.name || scope.row.username || ('ID ' + scope.row.studentId) }}
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="完成度" min-width="220">
+                    <template #default="scope">
+                      <div class="table-progress">
+                        <el-progress :percentage="scope.row.completionRate || 0" />
+                      </div>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="已完成" width="120">
+                    <template #default="scope">
+                      {{ scope.row.completedVideos || 0 }}/{{ scope.row.totalVideos || 0 }}
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="最近学习" width="180">
+                    <template #default="scope">
+                      {{ formatDateTime(scope.row.lastLearnedAt) || '暂无' }}
+                    </template>
+                  </el-table-column>
+                </el-table>
+                <el-empty v-if="teacherProgressStudents.length === 0" description="暂无学习进度" />
+              </el-card>
+            </div>
+            <el-empty v-else description="暂无学习统计" />
+          </el-tab-pane>
         </el-tabs>
       </el-main>
     </el-container>
@@ -602,6 +682,7 @@ export default {
         materials: [],
         announcements: []
       },
+      progressSummary: null,
       selectedVideo: null,
       selectedPlayInfo: null,
       selectedPlaybackMode: 'native',
@@ -641,6 +722,22 @@ export default {
     },
     latestAnnouncement() {
       return this.learningContent.announcements[0] || null
+    },
+    studentProgress() {
+      return this.progressSummary?.student || null
+    },
+    teacherProgressOverview() {
+      return this.progressSummary?.overview || null
+    },
+    teacherProgressStudents() {
+      return this.progressSummary?.students || []
+    },
+    studentVideoProgressMap() {
+      const videos = this.studentProgress?.videos || []
+      return videos.reduce((map, item) => {
+        map[item.videoId] = item
+        return map
+      }, {})
     },
     rootChapterOptions() {
       return this.learningContent.chapters.filter(chapter => !chapter.parentId)
@@ -702,6 +799,7 @@ export default {
         if (this.isTeacher) this.loadCourseStudents()
         if (this.isStudent) this.loadCourseHomeworks()
         if (this.isStudent || this.isTeacher) this.loadLearningContent()
+        if (this.isStudent || this.isTeacher) this.loadProgressSummary()
       } catch (error) {
         console.error('加载课程详情失败:', error)
         ElMessage.error('加载课程详情失败')
@@ -736,6 +834,16 @@ export default {
       } catch (error) {
         console.error('加载课程学习内容失败:', error)
         ElMessage.error('加载课程学习内容失败')
+      }
+    },
+
+    async loadProgressSummary() {
+      try {
+        const result = await api.getCourseProgressSummary(this.courseId)
+        this.progressSummary = result.data || null
+      } catch (error) {
+        console.error('加载学习进度统计失败:', error)
+        this.progressSummary = null
       }
     },
 
@@ -776,6 +884,9 @@ export default {
       this.progressSaving = true
       try {
         await api.saveVideoProgress(this.selectedVideo.id, Math.floor(currentTime), Math.floor(duration))
+        if (this.isStudent) {
+          await this.loadProgressSummary()
+        }
       } catch (error) {
         console.warn('保存播放进度失败:', error)
       } finally {
@@ -1080,6 +1191,37 @@ export default {
       return { admin: 'danger', teacher: 'success', student: 'primary' }[role] || 'info'
     },
 
+    getVideoProgressInfo(videoId) {
+      return this.studentVideoProgressMap[videoId] || { status: 'not_started', watchRate: 0 }
+    },
+
+    getProgressStatusLabel(status) {
+      return {
+        completed: '已完成',
+        in_progress: '学习中',
+        not_started: '未开始'
+      }[status] || '未开始'
+    },
+
+    getProgressTagType(status) {
+      return {
+        completed: 'success',
+        in_progress: 'warning',
+        not_started: 'info'
+      }[status] || 'info'
+    },
+
+    formatDateTime(value) {
+      if (!value) return ''
+      const date = new Date(value)
+      if (Number.isNaN(date.getTime())) return ''
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const hour = String(date.getHours()).padStart(2, '0')
+      const minute = String(date.getMinutes()).padStart(2, '0')
+      return `${month}-${day} ${hour}:${minute}`
+    },
+
     formatTime(timeStr) {
       if (!timeStr) return ''
       const diff = new Date() - new Date(timeStr)
@@ -1181,6 +1323,17 @@ export default {
 .card-header h4 { margin: 0; }
 .student-count { color: #909399; }
 
+.progress-board { display: grid; grid-template-columns: minmax(220px, 1fr) 150px 180px; gap: 12px; margin-bottom: 16px; }
+.progress-main, .progress-metric, .overview-cell { padding: 14px; border: 1px solid #e4e7ed; border-radius: 6px; background: #fff; }
+.progress-main > div { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.progress-main strong, .progress-metric strong, .overview-cell strong { color: #303133; font-size: 24px; line-height: 1.1; }
+.progress-label, .progress-metric span, .overview-cell span { display: block; color: #909399; font-size: 13px; margin-bottom: 8px; }
+.progress-metric { display: flex; flex-direction: column; justify-content: center; }
+.progress-metric strong { font-size: 18px; }
+.progress-overview-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.progress-table-card { margin-top: 0; }
+.table-progress { min-width: 180px; }
+
 .learning-layout { display: grid; grid-template-columns: 280px 1fr; gap: 16px; }
 .learning-sidebar { background: #fff; border: 1px solid #ebeef5; border-radius: 6px; padding: 12px; max-height: 620px; overflow: auto; }
 .announcement-strip { border-left: 3px solid #409EFF; padding-left: 10px; margin-bottom: 14px; color: #303133; }
@@ -1188,6 +1341,8 @@ export default {
 .chapter-block { margin-bottom: 14px; }
 .chapter-block h4 { margin: 0 0 8px; color: #303133; }
 .lesson-row, .material-row { display: block; width: 100%; text-align: left; padding: 8px 10px; margin-bottom: 6px; border: 1px solid #e4e7ed; border-radius: 4px; background: #f9fafb; color: #303133; text-decoration: none; cursor: pointer; }
+.lesson-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 38px; }
+.lesson-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lesson-row.active { border-color: #409EFF; color: #409EFF; background: #ecf5ff; }
 .material-row { color: #606266; }
 .child-chapter { margin-left: 12px; padding-left: 10px; border-left: 2px solid #ebeef5; }
@@ -1198,6 +1353,7 @@ export default {
 .manage-grid .el-card { min-width: 0; }
 
 @media (max-width: 900px) {
+  .progress-board, .progress-overview-grid { grid-template-columns: 1fr; }
   .learning-layout { grid-template-columns: 1fr; }
   .learning-sidebar { max-height: none; }
   .manage-grid { grid-template-columns: 1fr; }

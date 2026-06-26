@@ -82,6 +82,13 @@ export default {
     })
   },
 
+  getCourseProgressSummary(courseId) {
+    const user = getLocalUser()
+    return apiClient.get(`/course/${courseId}/progress/summary`, {
+      params: { userId: user.id, role: user.role }
+    })
+  },
+
   getCourseCategories() {
     return apiClient.get('/course/categories')
   },

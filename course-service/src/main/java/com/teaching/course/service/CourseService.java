@@ -281,6 +281,168 @@ public class CourseService {
         return result;
     }
 
+    public Map<String, Object> getCourseProgressSummary(Long courseId, Long userId, String role) {
+        Course course = requireCourse(courseId);
+        List<CourseVideo> publishedVideos = courseVideoRepository.findByCourseIdOrderBySortOrderAscIdAsc(courseId)
+                .stream()
+                .filter(video -> CourseVideo.VideoStatus.published.equals(video.getStatus()))
+                .collect(Collectors.toList());
+        List<Long> videoIds = publishedVideos.stream()
+                .map(CourseVideo::getId)
+                .collect(Collectors.toList());
+        List<VideoProgress> progressRows = videoIds.isEmpty()
+                ? Collections.emptyList()
+                : videoProgressRepository.findByVideoIdIn(videoIds);
+
+        if ("student".equalsIgnoreCase(role)) {
+            requireStudentSelectedCourse(courseId, userId);
+            List<VideoProgress> studentProgress = progressRows.stream()
+                    .filter(progress -> userId.equals(progress.getStudentId()))
+                    .collect(Collectors.toList());
+            Map<String, Object> result = new HashMap<>();
+            result.put("courseId", course.getId());
+            result.put("courseName", course.getName());
+            result.put("totalVideos", publishedVideos.size());
+            result.put("student", buildStudentProgress(userId, null, studentProgress, publishedVideos, true));
+            return result;
+        }
+
+        if ("teacher".equalsIgnoreCase(role)) {
+            requireTeacherOwnsCourse(courseId, userId);
+            List<CourseSelection> selections = courseSelectionRepository.findByCourseId(courseId)
+                    .stream()
+                    .filter(selection -> CourseSelection.SelectionStatus.selected.equals(selection.getStatus()))
+                    .collect(Collectors.toList());
+            Map<Long, List<VideoProgress>> progressByStudent = progressRows.stream()
+                    .collect(Collectors.groupingBy(VideoProgress::getStudentId));
+            Map<Long, Map<String, Object>> studentInfoMap = getCourseStudents(courseId).stream()
+                    .collect(Collectors.toMap(
+                            row -> ((Number) row.get("id")).longValue(),
+                            row -> row,
+                            (first, second) -> first));
+
+            List<Map<String, Object>> students = selections.stream()
+                    .map(selection -> buildStudentProgress(
+                            selection.getStudentId(),
+                            studentInfoMap.get(selection.getStudentId()),
+                            progressByStudent.getOrDefault(selection.getStudentId(), Collections.emptyList()),
+                            publishedVideos,
+                            false))
+                    .sorted(Comparator.comparing(progress -> (Integer) progress.get("completionRate")))
+                    .collect(Collectors.toList());
+
+            int studentCount = students.size();
+            long completedStudents = students.stream()
+                    .filter(student -> (Integer) student.get("completedVideos") == publishedVideos.size() && !publishedVideos.isEmpty())
+                    .count();
+            long notStartedStudents = students.stream()
+                    .filter(student -> (Integer) student.get("startedVideos") == 0)
+                    .count();
+            long inProgressStudents = Math.max(0, studentCount - completedStudents - notStartedStudents);
+            int averageCompletionRate = studentCount == 0
+                    ? 0
+                    : (int) Math.round(students.stream()
+                            .mapToInt(student -> (Integer) student.get("completionRate"))
+                            .average()
+                            .orElse(0));
+
+            Map<String, Object> overview = new HashMap<>();
+            overview.put("averageCompletionRate", averageCompletionRate);
+            overview.put("completedStudents", completedStudents);
+            overview.put("inProgressStudents", inProgressStudents);
+            overview.put("notStartedStudents", notStartedStudents);
+            overview.put("studentCount", studentCount);
+            overview.put("totalVideos", publishedVideos.size());
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("courseId", course.getId());
+            result.put("courseName", course.getName());
+            result.put("overview", overview);
+            result.put("students", students);
+            return result;
+        }
+
+        throw new RuntimeException("No permission to access course progress");
+    }
+
+    private Map<String, Object> buildStudentProgress(Long studentId,
+                                                     Map<String, Object> studentInfo,
+                                                     List<VideoProgress> progressRows,
+                                                     List<CourseVideo> videos,
+                                                     boolean includeVideos) {
+        Map<Long, VideoProgress> progressByVideo = progressRows.stream()
+                .collect(Collectors.toMap(VideoProgress::getVideoId, progress -> progress, (first, second) -> second));
+        int totalVideos = videos.size();
+        int completedVideos = 0;
+        int startedVideos = 0;
+        LocalDateTime lastLearnedAt = null;
+
+        List<Map<String, Object>> videoProgressList = new ArrayList<>();
+        for (CourseVideo video : videos) {
+            VideoProgress progress = progressByVideo.get(video.getId());
+            Map<String, Object> videoProgress = buildVideoProgress(video, progress);
+            String status = (String) videoProgress.get("status");
+            if ("completed".equals(status)) {
+                completedVideos++;
+            }
+            if (progress != null && progress.getLastPosition() != null && progress.getLastPosition() > 0) {
+                startedVideos++;
+            }
+            if (progress != null && progress.getUpdatedAt() != null
+                    && (lastLearnedAt == null || progress.getUpdatedAt().isAfter(lastLearnedAt))) {
+                lastLearnedAt = progress.getUpdatedAt();
+            }
+            if (includeVideos) {
+                videoProgressList.add(videoProgress);
+            }
+        }
+
+        int completionRate = totalVideos == 0 ? 0 : (int) Math.round(completedVideos * 100.0 / totalVideos);
+        Map<String, Object> result = new HashMap<>();
+        result.put("studentId", studentId);
+        result.put("username", studentInfo != null ? studentInfo.get("username") : null);
+        result.put("name", studentInfo != null ? studentInfo.get("name") : null);
+        result.put("totalVideos", totalVideos);
+        result.put("completedVideos", completedVideos);
+        result.put("startedVideos", startedVideos);
+        result.put("completionRate", completionRate);
+        result.put("lastLearnedAt", lastLearnedAt);
+        if (includeVideos) {
+            result.put("videos", videoProgressList);
+        }
+        return result;
+    }
+
+    private Map<String, Object> buildVideoProgress(CourseVideo video, VideoProgress progress) {
+        int lastPosition = progress != null && progress.getLastPosition() != null ? progress.getLastPosition() : 0;
+        int effectiveDuration = getEffectiveDuration(video, progress);
+        int watchRate = effectiveDuration == 0 ? 0 : (int) Math.round(Math.min(100, lastPosition * 100.0 / effectiveDuration));
+        String status = "not_started";
+        if (effectiveDuration > 0 && watchRate >= 90) {
+            status = "completed";
+        } else if (lastPosition > 0) {
+            status = "in_progress";
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("videoId", video.getId());
+        result.put("title", video.getTitle());
+        result.put("chapterId", video.getChapterId());
+        result.put("lastPosition", lastPosition);
+        result.put("duration", effectiveDuration);
+        result.put("watchRate", watchRate);
+        result.put("status", status);
+        result.put("updatedAt", progress != null ? progress.getUpdatedAt() : null);
+        return result;
+    }
+
+    private int getEffectiveDuration(CourseVideo video, VideoProgress progress) {
+        if (progress != null && progress.getDuration() != null && progress.getDuration() > 0) {
+            return progress.getDuration();
+        }
+        return video.getDuration() != null && video.getDuration() > 0 ? video.getDuration() : 0;
+    }
+
     @Transactional
     public CourseChapter saveChapter(Long courseId, Long teacherId, CourseChapter chapter) {
         requireTeacherOwnsCourse(courseId, teacherId);
